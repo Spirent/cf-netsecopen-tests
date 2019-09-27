@@ -20,7 +20,7 @@ In case of path errors when executing the scripts.
 Add project to python path (add the project, not the cf_runtest sub dir)
 
 Linux: 
-export PYTHONPATH=/path/to/spectre-core:$PYTHONPATH
+export PYTHONPATH=/path/to/cf-netsecopen-tests:$PYTHONPATH
 
 Windows: 
-set PYTHONPATH=%PYTHONPATH%;C:\path\to\spectre-core
+set PYTHONPATH=%PYTHONPATH%;C:\path\to\cf-netsecopen-tests
