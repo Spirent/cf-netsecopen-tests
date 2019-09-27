@@ -18,5 +18,9 @@ To use script:
 
 In case of path errors when executing the scripts.
 Add project to python path (add the project, not the cf_runtest sub dir)
-Linux: export PYTHONPATH=/path/to/spectre-core:$PYTHONPATH
-Windows: set PYTHONPATH=%PYTHONPATH%;C:\path\to\spectre-core
+
+Linux: 
+export PYTHONPATH=/path/to/spectre-core:$PYTHONPATH
+
+Windows: 
+set PYTHONPATH=%PYTHONPATH%;C:\path\to\spectre-core
