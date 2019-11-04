@@ -174,6 +174,8 @@ class CfRunTest:
         if self.in_goal_seek.lower() in {"true", "y", "yes"}:
             self.in_goal_seek = True
             self.first_steady_interval = False
+        else:
+            self.in_goal_seek = False
 
         self.test_config = self.get_test_config()
         self.queue_id = self.test_config["config"]["queue"]["id"]
