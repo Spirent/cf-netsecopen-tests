@@ -1115,7 +1115,11 @@ class CfRunTest:
             f"{self.rolling_count_since_goal_seek.list} "
             f"tps_list stable: {self.rolling_tps.stable} {self.rolling_tps.list}"
         )
-        if self.rolling_tps.stable and self.rolling_count_since_goal_seek.stable:
+        if self.phase is not "goalseek":
+            log.info(f"phase {self.phase} is not 'goalseek', "
+                     f"returning from contol_test_goal_seek")
+            return
+        elif self.rolling_tps.stable and self.rolling_count_since_goal_seek.stable:
             if self.max_load_reached:
                 log.info(f"control_test end, max_load_reached")
                 self.stop = True
