@@ -290,6 +290,12 @@ class CfCreateTest(BaseTest):
             print(f"\nUnable to set sslTls enabled state \n{e}")
         if self.tls_version is not None:
             try:
+                # Reset tlsv12 and tlsv13 back to false
+                self.protocol["supplemental"]["sslTls"]["tlsv12"] = False
+                self.protocol["supplemental"]["sslTls"]["tlsv13"] = False
+            except Exception as e:
+                print(f"\nUnable to set reset tls_version settings \n{e}")
+            try:
                 # using tls_version as var to set right tls key to true
                 self.protocol["supplemental"]["sslTls"][tls_version] = True
             except Exception as e:
