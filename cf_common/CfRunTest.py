@@ -505,6 +505,7 @@ class CfRunTest:
             phase = "steady"
             if self.first_steady_interval:
                 phase = "rampup"
+                self.first_steady_interval = False
         elif (
             (self.in_startup + self.in_rampup + steady_duration)
             <= self.time_elapsed
