@@ -976,7 +976,7 @@ class CfRunTest:
             log.error(
                 f"Exception occurred when changing test: " f"\n<{detailed_exception}>"
             )
-        self.countdown(12)
+        self.countdown(20)
         return True
 
     def goal_seek_set_default(self):
