@@ -323,6 +323,9 @@ class CfRunTest:
         self.rolling_count_since_goal_seek = RollingStats(
             self.rolling_sample_size, 1
         )  # round to 1 for > 0 avg
+        self.rolling_cps = RollingStats(self.rolling_sample_size, 0)
+        self.rolling_conns = RollingStats(self.rolling_sample_size, 0)
+        self.rolling_bw = RollingStats(self.rolling_sample_size, 0)
 
         self.start_time = time.time()
         self.timer = time.time() - self.start_time
@@ -707,11 +710,23 @@ class CfRunTest:
             f"{self.time_elapsed}s {self.phase} -load: {self.c_current_load:,}/{self.c_desired_load:,} "
             f"-current/desired var: {self.c_current_desired_load_variance} "
             f"-current avg/max var: {self.rolling_tps.avg_max_load_variance} "
-            f"\n-tps: {self.c_http_successful_txns_sec:,} -tps stable: {self.rolling_tps.stable}"
+            f"\n-tps: {self.c_http_successful_txns_sec:,} -tps stable: {self.rolling_tps.stable} "
             f"-tps cur avg: {self.rolling_tps.avg_val:,} -tps prev: {self.rolling_tps.avg_val_last:,} "
             f"-delta tps: {self.rolling_tps.increase_avg} -tps list:{self.rolling_tps.list} "
-            f"\n-total bw: {self.c_total_bandwidth:,} -rx bw: {self.c_rx_bandwidth:,}"
-            f" tx bw: {self.c_tx_bandwidth:,}"
+            f"\n-cps: {self.c_tcp_established_conn_rate:,} -cps stable: {self.rolling_cps.stable} "
+            f"-cps cur avg: {self.rolling_cps.avg_val:,} -cps prev: {self.rolling_cps.avg_val_last:,} "
+            f"-delta cps: {self.rolling_cps.increase_avg} -cps list:{self.rolling_cps.list} "
+            f"\n-conns: {self.c_tcp_established_conns:,} -conns stable: {self.rolling_conns.stable} "
+            f"-conns cur avg: {self.rolling_conns.avg_val:,} -conns prev: {self.rolling_conns.avg_val_last:,} "
+            f"-delta conns: {self.rolling_cps.increase_avg} -conns list:{self.rolling_conns.list} "
+            f"\n-bw: {self.c_total_bandwidth:,} -bw stable: {self.rolling_bw.stable} "
+            f"-bw cur avg: {self.rolling_bw.avg_val:,} -bw prev: {self.rolling_bw.avg_val_last:,} "
+            f"-delta bw: {self.rolling_bw.increase_avg} -bw list:{self.rolling_bw.list} "
+            f"\n-ttfb: {self.c_tcp_avg_ttfb:,} -ttfb stable: {self.rolling_ttfb.stable} "
+            f"-ttfb cur avg: {self.rolling_ttfb.avg_val:,} -ttfb prev: {self.rolling_ttfb.avg_val_last:,} "
+            f"-delta ttfb: {self.rolling_ttfb.increase_avg} -ttfb list:{self.rolling_ttfb.list} "
+            # f"\n-total bw: {self.c_total_bandwidth:,} -rx bw: {self.c_rx_bandwidth:,}"
+            # f" tx bw: {self.c_tx_bandwidth:,}"
             # f"\n-ttfb cur avg: {self.rolling_ttfb.avg_val} -ttfb prev: {self.rolling_ttfb.avg_val_last} "
             # f"-delta ttfb: {self.rolling_ttfb.increase_avg} -ttfb list:{self.rolling_ttfb.list}"
         )
@@ -972,6 +987,9 @@ class CfRunTest:
             self.rolling_tps.load_increase_complete()
             self.rolling_ttfb.load_increase_complete()
             self.rolling_current_load.load_increase_complete()
+            self.rolling_cps.load_increase_complete()
+            self.rolling_conns.load_increase_complete()
+            self.rolling_bw.load_increase_complete()
         except Exception as detailed_exception:
             log.error(
                 f"Exception occurred when changing test: " f"\n<{detailed_exception}>"
@@ -1047,6 +1065,15 @@ class CfRunTest:
 
         self.rolling_current_load.update(self.c_current_load)
         self.rolling_current_load.check_if_stable(self.max_var_reference)
+
+        self.rolling_cps.update(self.c_tcp_established_conn_rate)
+        self.rolling_cps.check_if_stable(self.max_var_reference)
+
+        self.rolling_conns.update(self.c_tcp_established_conns)
+        self.rolling_conns.check_if_stable(self.max_var_reference)
+
+        self.rolling_bw.update(self.c_total_bandwidth)
+        self.rolling_bw.check_if_stable(self.max_var_reference)
 
         self.rolling_count_since_goal_seek.update(1)
         self.rolling_count_since_goal_seek.check_if_stable(0)
