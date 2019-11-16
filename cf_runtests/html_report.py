@@ -40,4 +40,4 @@ for k, v in html_additional_reports.items():
     report_file = pathlib.Path(file_path / new_name).with_suffix(".html")
     print(report_file)
     print(v)
-    html_report(table, report_tables, report_file, v)
+    html_report(table, report_tables, report_file, v, script_version)

@@ -8,6 +8,8 @@ import pandas as pd
 import pathlib
 import sys
 
+script_version = 1.71
+
 project_dir = pathlib.Path().absolute().parent
 sys.path.append(str(project_dir))
 
@@ -142,6 +144,7 @@ class RollingStats:
 
 class CfRunTest:
     def __init__(self, cf, test_details, result_file, temp_file_dir):
+        log.info(f"script version: {script_version}")
         self.cf = cf  # CfClient instance
         self.result_file = result_file
         self.temp_dir = temp_file_dir
@@ -160,6 +163,9 @@ class CfRunTest:
         self.in_rampdown = int(test_details["rampdown"])
         self.in_shutdown = int(test_details["shutdown"])
         self.in_sustain_period = int(test_details["sustain_period"])
+        self.in_kpi_1 = test_details["kpi_1"]
+        self.in_kpi_2 = test_details["kpi_2"]
+        self.in_kpi_and_or = self.return_bool_true(test_details["kpi_and_or"], "AND")
         self.in_threshold_low = float(test_details["low_threshold"])
         self.in_threshold_med = float(test_details["med_threshold"])
         self.in_threshold_high = float(test_details["high_threshold"])
@@ -176,6 +182,11 @@ class CfRunTest:
             self.first_steady_interval = False
         else:
             self.in_goal_seek = False
+
+        self.kpi_1_stable = True
+        self.kpi_2_stable = True
+        self.kpi_1_list = []
+        self.kpi_2_list = []
 
         self.test_config = self.get_test_config()
         self.queue_id = self.test_config["config"]["queue"]["id"]
@@ -1078,6 +1089,54 @@ class CfRunTest:
         self.rolling_count_since_goal_seek.update(1)
         self.rolling_count_since_goal_seek.check_if_stable(0)
 
+    def check_kpi(self):
+        self.in_kpi_1 = self.in_kpi_1.lower()
+        if self.in_kpi_1 == "tps":
+            self.kpi_1_stable = self.rolling_tps.stable
+            self.kpi_1_list = self.rolling_tps.list
+        elif self.in_kpi_1 == "cps":
+            self.kpi_1_stable = self.rolling_cps.stable
+            self.kpi_1_list = self.rolling_cps.list
+        elif self.in_kpi_1 == "conns":
+            self.kpi_1_stable = self.rolling_conns.stable
+            self.kpi_1_list = self.rolling_conns.list
+        elif self.in_kpi_1 == "bw":
+            self.kpi_1_stable = self.rolling_bw.stable
+            self.kpi_1_list = self.rolling_bw.list
+        elif self.in_kpi_1 == "ttfb":
+            self.kpi_1_stable = self.rolling_ttfb.stable
+            self.kpi_1_list = self.rolling_ttfb.list
+        else:
+            self.in_kpi_1 = None
+
+        self.in_kpi_2 = self.in_kpi_2.lower()
+        if self.in_kpi_2 == "tps":
+            self.kpi_2_stable = self.rolling_tps.stable
+            self.kpi_2_list = self.rolling_tps.list
+        elif self.in_kpi_2 == "cps":
+            self.kpi_2_stable = self.rolling_cps.stable
+            self.kpi_2_list = self.rolling_cps.list
+        elif self.in_kpi_2 == "conns":
+            self.kpi_2_stable = self.rolling_conns.stable
+            self.kpi_2_list = self.rolling_conns.list
+        elif self.in_kpi_2 == "bw":
+            self.kpi_2_stable = self.rolling_bw.stable
+            self.kpi_2_list = self.rolling_bw.list
+        elif self.in_kpi_2 == "ttfb":
+            self.kpi_2_stable = self.rolling_ttfb.stable
+            self.kpi_2_list = self.rolling_ttfb.list
+        else:
+            self.in_kpi_2 = None
+
+    @staticmethod
+    def return_bool_true(check_if, is_value):
+        if isinstance(check_if, bool):
+            return check_if
+        if isinstance(check_if, str) and check_if.lower() == is_value:
+            return True
+        return False
+
+
     def control_test(self):
         """Main test control
 
@@ -1119,12 +1178,15 @@ class CfRunTest:
                 log.info(f"control_test end, over duration time > phase: finished")
                 self.stop = True
             self.update_rolling_averages()
+            self.check_kpi()
             # print stats if test is running
             if self.sub_status is None:
                 self.print_test_stats()
                 self.save_results()
             if self.in_goal_seek:  # checks if goal seeking is selected for a test
-                self.control_test_goal_seek()
+                # self.control_test_goal_seek()
+                self.control_test_goal_seek_kpi(self.kpi_1_stable, self.kpi_1_list,
+                                                self.kpi_2_stable, self.kpi_2_list, self.in_kpi_and_or)
             print(f"")
             time.sleep(4)
         # if goal_seek is yes enter sustained steady phase
@@ -1160,6 +1222,54 @@ class CfRunTest:
                 else:
                     log.info(f"control_test end, goal_seek False")
                     self.stop = True
+
+    def control_test_goal_seek_kpi(self, kpi1_stable, kpi1_list,
+                                   kpi2_stable, kpi2_list, kpis_and_bool):
+        log.info(
+            f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
+            f"list: {self.rolling_count_since_goal_seek.list} "
+            f"\nKpi1 stable: {kpi1_stable} list: {kpi1_list}"
+            f"\nKpi2 stable: {kpi2_stable} list: {kpi2_list}"
+        )
+        if self.phase is not "goalseek":
+            log.info(f"phase {self.phase} is not 'goalseek', "
+                     f"returning from contol_test_goal_seek")
+            return
+        if not self.rolling_count_since_goal_seek.stable:
+            log.info(f"count since goal seek is not stable. "
+                     f"count list: {self.rolling_count_since_goal_seek.list}")
+            return
+        if self.max_load_reached:
+            log.info(f"control_test end, max_load_reached")
+            self.stop = True
+            return
+
+        # Set KPIs to stable if they are configured to None so goal seeking starts/continues
+        if self.in_kpi_1 is None:
+            kpi1_stable = True
+        if self.in_kpi_2 is None:
+            kpi2_stable = True
+
+        if kpis_and_bool:
+            if kpi1_stable and kpi2_stable:
+                goal_seek = True
+            else:
+                goal_seek = False
+        else:
+            if kpi1_stable or kpi2_stable:
+                goal_seek = True
+            else:
+                goal_seek = False
+
+        if goal_seek:
+            if self.goal_seek():
+                # reset rolling count > no load increase until
+                # at least the window size interval.
+                # allows stats to stabilize after an increase
+                self.rolling_count_since_goal_seek.reset()
+            else:
+                log.info(f"control_test end, goal_seek False")
+                self.stop = True
 
     def sustain_test(self):
         self.phase = "steady"
@@ -1203,14 +1313,21 @@ class CfRunTest:
             self.c_http_aborted_txns,
             self.c_transaction_error_percentage,
             self.c_tcp_established_conn_rate,
+            self.rolling_cps.stable,
+            self.rolling_cps.increase_avg,
             self.c_tcp_established_conns,
+            self.rolling_conns.stable,
+            self.rolling_conns.increase_avg,
             self.c_tcp_avg_tt_synack,
             self.c_tcp_avg_ttfb,
+            self.rolling_ttfb.stable,
             self.rolling_ttfb.increase_avg,
             self.c_url_avg_response_time,
             self.c_tcp_cumulative_established_conns,
             self.c_tcp_cumulative_attempted_conns,
             self.c_total_bandwidth,
+            self.rolling_bw.stable,
+            self.rolling_bw.increase_avg,
             self.c_rx_bandwidth,
             self.c_tx_bandwidth,
             self.c_rx_packet_rate,
@@ -1259,14 +1376,21 @@ class DetailedCsvReport:
             "aborted_txn",
             "txn_error_rate",
             "cps",
+            "cps_stable",
+            "cps_delta",
             "open_conns",
+            "conns_stable",
+            "conns_delta",
             "tcp_avg_tt_synack",
             "tcp_avg_ttfb",
+            "ttfb_stable",
             "ttfb_delta",
             "url_response_time",
             "total_tcp_established",
             "total_tcp_attempted",
             "total_bandwidth",
+            "bw_stable",
+            "bw_delta",
             "rx_bandwidth",
             "tx_bandwidth",
             "rx_packet_rate",
