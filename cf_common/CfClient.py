@@ -266,6 +266,7 @@ class CfClient:
             response = self.__session.put(
                 self.api + "/test_runs/" + test_run_id + "/changeload", data=load
             )
+            response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -276,7 +277,8 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        log.debug(f"change load: {load} > {json.dumps(dict_response, indent=4)}")
+        log.debug(f"change load: {load} > {json.dumps(dict_response, indent=4)}"
+                  f"response: {response}")
         return dict_response
 
     def get_system_version(self):

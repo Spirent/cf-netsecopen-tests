@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pathlib
 import sys
+import math
 
 script_version = 1.71
 
@@ -163,9 +164,9 @@ class CfRunTest:
         self.in_rampdown = int(test_details["rampdown"])
         self.in_shutdown = int(test_details["shutdown"])
         self.in_sustain_period = int(test_details["sustain_period"])
-        self.in_kpi_1 = test_details["kpi_1"]
-        self.in_kpi_2 = test_details["kpi_2"]
-        self.in_kpi_and_or = self.return_bool_true(test_details["kpi_and_or"], "AND")
+        self.in_kpi_1 = test_details.get("kpi_1", "tps")
+        self.in_kpi_2 = test_details.get("kpi_2", "cps")
+        self.in_kpi_and_or = self.return_bool_true(test_details.get("kpi_and_or"), "AND")
         self.in_threshold_low = float(test_details["low_threshold"])
         self.in_threshold_med = float(test_details["med_threshold"])
         self.in_threshold_high = float(test_details["high_threshold"])
@@ -173,6 +174,12 @@ class CfRunTest:
         self.variance_sample_size = int(test_details["variance_sample_size"])
         self.in_max_variance = float(test_details["max_variance"])
         # self.in_capacity_adjust = int(test_details["capacity_adj"])
+
+        self.in_ramp_seek = self.if_in_set_true(test_details, "ramp_seek",
+                                                {"true", "y", "yes"})
+        self.in_ramp_seek_kpi = test_details.get("ramp_kpi", "tps")
+        self.in_ramp_seek_value = int(test_details.get("ramp_value", 1))
+        self.ramp_seek_complete = False
 
         self.in_goal_seek = False
         self.first_steady_interval = True
@@ -182,11 +189,6 @@ class CfRunTest:
             self.first_steady_interval = False
         else:
             self.in_goal_seek = False
-
-        self.kpi_1_stable = True
-        self.kpi_2_stable = True
-        self.kpi_1_list = []
-        self.kpi_2_list = []
 
         self.test_config = self.get_test_config()
         self.queue_id = self.test_config["config"]["queue"]["id"]
@@ -319,7 +321,8 @@ class CfRunTest:
         self.s_tcp_closed_reset = 0
         self.s_memory_percent_used = 0
 
-        self.first_load_increase = True
+        self.first_ramp_load_increase = True
+        self.first_goal_load_increase = True
         self.max_load_reached = False
         self.max_load = 0
         self.stop = False  # test loop control
@@ -338,6 +341,14 @@ class CfRunTest:
         self.rolling_conns = RollingStats(self.rolling_sample_size, 0)
         self.rolling_bw = RollingStats(self.rolling_sample_size, 0)
 
+        self.kpi_1 = self.rolling_tps
+        self.kpi_2 = self.rolling_cps
+        self.kpi_1_stable = True
+        self.kpi_2_stable = True
+        self.kpi_1_list = []
+        self.kpi_2_list = []
+        self.ramp_seek_kpi = self.rolling_tps
+
         self.start_time = time.time()
         self.timer = time.time() - self.start_time
         self.time_to_run = 0
@@ -349,6 +360,14 @@ class CfRunTest:
 
         # create entry in result file at the start of test
         self.save_results()
+
+    @staticmethod
+    def if_in_set_true(dict_var, dict_key, in_set):
+        if dict_key in dict_var:
+            var = dict_var[dict_key]
+            if var.lower() in in_set:
+                return True
+        return False
 
     def get_test_config(self):
         try:
@@ -538,9 +557,14 @@ class CfRunTest:
         log.info(f"test phase: {phase}")
         self.phase = phase
 
+        # Override phase if ramp seek is enabled
+        if self.in_ramp_seek and self.phase == "steady" and not self.ramp_seek_complete:
+            self.phase = "rampseek"
+            log.info(f"ramp seek phase: {self.phase}")
         # Override phase if goal seeking is enabled
-        if self.in_goal_seek and self.phase == "steady":
+        elif self.in_goal_seek and self.phase == "steady":
             self.phase = "goalseek"
+            log.info(f"goal seek phase: {self.phase}")
 
     def update_run_stats(self):
         get_run_stats = self.cf.fetch_test_run_statistics(self.id)
@@ -958,27 +982,20 @@ class CfRunTest:
             self.stop = True
             log.info(f"goal_seek stop, c_current_load == 0")
             return False
-        if self.first_load_increase:
-            self.first_load_increase = False
-            new_load = self.c_current_load + (
-                self.in_incr_low * self.in_capacity_adjust
-            )
+        if self.first_goal_load_increase:
+            self.first_goal_load_increase = False
+            new_load = self.c_current_load + (self.in_incr_low *
+                                              self.in_capacity_adjust)
         else:
-            if self.test_config["config"]["loadSpecification"]["type"].lower() in {
-                "simusers",
-                "simusers/second",
-            }:
-                new_load = self.goal_seek_set_simuser()
+            if self.check_if_load_type_simusers():
+                new_load = self.goal_seek_set_simuser_kpi(self.kpi_1)
                 log.info(f"new_load = {new_load}")
-            elif self.test_config["config"]["loadSpecification"]["type"].lower() in {
-                "bandwidth",
-                "connections",
-                "connections/second",
-            }:
+            elif self.check_if_load_type_default():
                 new_load = self.goal_seek_set_default()
                 log.info(f"new_load = {new_load}")
             else:
-                report_error = f"Unknown load type: {self.test_config['config']['loadSpecification']['type']}"
+                report_error = f"Unknown load type: " \
+                    f"{self.test_config['config']['loadSpecification']['type']}"
                 log.error(report_error)
                 print(report_error)
                 return False
@@ -990,6 +1007,74 @@ class CfRunTest:
             log.info(f"Goal_seek return, new_load is False")
             return False
 
+        # log_msg = f"\nchanging load from: {self.c_current_load} to: {new_load}  status: {self.status}"
+        # log.info(log_msg)
+        # print(log_msg)
+
+        self.change_update_load(new_load)
+
+        # try:
+        #     self.cf.change_load(self.id, new_load)
+        #     self.rolling_tps.load_increase_complete()
+        #     self.rolling_ttfb.load_increase_complete()
+        #     self.rolling_current_load.load_increase_complete()
+        #     self.rolling_cps.load_increase_complete()
+        #     self.rolling_conns.load_increase_complete()
+        #     self.rolling_bw.load_increase_complete()
+        # except Exception as detailed_exception:
+        #     log.error(
+        #         f"Exception occurred when changing test: " f"\n<{detailed_exception}>"
+        #     )
+        # self.countdown(20)
+        return True
+
+    def ramp_seek(self, ramp_kpi, ramp_to_value):
+        log.info(f"In ramp_seek function")
+        if self.c_current_load == 0:
+            self.stop = True
+            log.info(f"ramp_seek stop, c_current_load == 0")
+            return False
+        # if self.first_ramp_load_increase:
+        #     self.first_ramp_load_increase = False
+        #     new_load = self.c_current_load * 2
+        if ramp_kpi.avg_val < ramp_to_value:
+            load_increase = round(ramp_to_value / ramp_kpi.avg_val, 3)
+            # new_load = math.ceil(self.c_current_load * load_increase)
+            new_load = self.round_up_to_even(self.c_current_load * load_increase)
+            log.info(f"new load: {new_load}, current_load: {self.c_current_load} "
+                     f" * {load_increase} load_increase"
+                     f"\n ramp_to_value: {ramp_to_value} "
+                     f"ramp_kpi.avg_val: {ramp_kpi.avg_val}"
+                     )
+            self.in_incr_low = self.round_up_to_even(new_load * 0.6)
+            self.in_incr_med = self.round_up_to_even(new_load * 0.5)
+            self.in_incr_high = self.round_up_to_even(new_load * 0.4)
+        self.change_update_load(new_load)
+        return True
+
+    @staticmethod
+    def round_up_to_even(v):
+        return math.ceil(v / 2.) * 2
+
+    def check_if_load_type_simusers(self):
+        if self.test_config["config"]["loadSpecification"]["type"].lower() in {
+            "simusers",
+            "simusers/second",
+        }:
+            return True
+        return False
+
+    def check_if_load_type_default(self):
+        if self.test_config["config"]["loadSpecification"]["type"].lower() in {
+            "bandwidth",
+            "connections",
+            "connections/second",
+        }:
+            return True
+        return False
+
+    def change_update_load(self, new_load):
+        new_load = self.round_up_to_even(new_load)
         log_msg = f"\nchanging load from: {self.c_current_load} to: {new_load}  status: {self.status}"
         log.info(log_msg)
         print(log_msg)
@@ -1034,32 +1119,60 @@ class CfRunTest:
                 set_load = self.in_threshold_high
         return set_load
 
-    def goal_seek_set_simuser(self):
-        log.info(f"in goal_seek_set_simuser function")
+    # def goal_seek_set_simuser(self):
+    #     # Replaced by goal_seek_set_simuser_kpi
+    #     log.debug(f"in goal_seek_set_simuser function")
+    #     set_load = 0
+    #     if self.rolling_tps.increase_avg >= self.in_threshold_low:
+    #         set_load = self.c_current_load + (
+    #             self.in_incr_low * self.in_capacity_adjust
+    #         )
+    #     elif self.rolling_tps.increase_avg >= self.in_threshold_med:
+    #         set_load = self.c_current_load + (
+    #             self.in_incr_med * self.in_capacity_adjust
+    #         )
+    #     elif self.rolling_tps.increase_avg >= self.in_threshold_high:
+    #         set_load = self.c_current_load + (
+    #             self.in_incr_high * self.in_capacity_adjust
+    #         )
+    #     elif self.rolling_tps.increase_avg < self.in_threshold_high:
+    #         log.info(
+    #             f"rolling_tps.increase_avg < in_threshold_high, "
+    #             f"{self.rolling_tps.increase_avg} < {self.in_threshold_high}"
+    #         )
+    #         return False
+    #     if self.rolling_tps.avg_max_load_variance < 0.97:
+    #         set_load = self.c_current_load
+    #         self.max_load_reached = True
+    #     log.info(
+    #         f"set_load = {set_load}  rolling_tps.avg_max_load_variance: {self.rolling_tps.avg_max_load_variance}"
+    #     )
+    #     return set_load
+
+    def goal_seek_set_simuser_kpi(self, kpi):
+        log.debug(f"in goal_seek_set_simuser_kpi function")
         set_load = 0
-        if self.rolling_tps.increase_avg >= self.in_threshold_low:
-            set_load = self.c_current_load + (
-                self.in_incr_low * self.in_capacity_adjust
-            )
-        elif self.rolling_tps.increase_avg >= self.in_threshold_med:
-            set_load = self.c_current_load + (
-                self.in_incr_med * self.in_capacity_adjust
-            )
-        elif self.rolling_tps.increase_avg >= self.in_threshold_high:
-            set_load = self.c_current_load + (
-                self.in_incr_high * self.in_capacity_adjust
-            )
-        elif self.rolling_tps.increase_avg < self.in_threshold_high:
+        if kpi.increase_avg >= self.in_threshold_low:
+            set_load = self.c_current_load + (self.in_incr_low *
+                                              self.in_capacity_adjust)
+        elif kpi.increase_avg >= self.in_threshold_med:
+            set_load = self.c_current_load + (self.in_incr_med *
+                                              self.in_capacity_adjust)
+        elif kpi.increase_avg >= self.in_threshold_high:
+            set_load = self.c_current_load + (self.in_incr_high *
+                                              self.in_capacity_adjust)
+        elif kpi.increase_avg < self.in_threshold_high:
             log.info(
-                f"rolling_tps.increase_avg < in_threshold_high, "
-                f"{self.rolling_tps.increase_avg} < {self.in_threshold_high}"
+                f"rolling_tps.increase_avg {kpi.increase_avg} < "
+                f"{self.in_threshold_high} in_threshold_high"
             )
             return False
-        if self.rolling_tps.avg_max_load_variance < 0.97:
+        if kpi.avg_max_load_variance < 0.97:
             set_load = self.c_current_load
             self.max_load_reached = True
         log.info(
-            f"set_load = {set_load}  rolling_tps.avg_max_load_variance: {self.rolling_tps.avg_max_load_variance}"
+            f"set_load = {set_load}  "
+            f"kpi_avg_max_load_variance: {kpi.avg_max_load_variance}"
         )
         return set_load
 
@@ -1092,41 +1205,48 @@ class CfRunTest:
     def check_kpi(self):
         self.in_kpi_1 = self.in_kpi_1.lower()
         if self.in_kpi_1 == "tps":
-            self.kpi_1_stable = self.rolling_tps.stable
-            self.kpi_1_list = self.rolling_tps.list
+            self.kpi_1 = self.rolling_tps
         elif self.in_kpi_1 == "cps":
-            self.kpi_1_stable = self.rolling_cps.stable
-            self.kpi_1_list = self.rolling_cps.list
+            self.kpi_1 = self.rolling_cps
         elif self.in_kpi_1 == "conns":
-            self.kpi_1_stable = self.rolling_conns.stable
-            self.kpi_1_list = self.rolling_conns.list
+            self.kpi_1 = self.rolling_conns
         elif self.in_kpi_1 == "bw":
-            self.kpi_1_stable = self.rolling_bw.stable
-            self.kpi_1_list = self.rolling_bw.list
+            self.kpi_1 = self.rolling_bw
         elif self.in_kpi_1 == "ttfb":
-            self.kpi_1_stable = self.rolling_ttfb.stable
-            self.kpi_1_list = self.rolling_ttfb.list
+            self.kpi_1 = self.rolling_ttfb
         else:
-            self.in_kpi_1 = None
+            log.debug(f"check_kpi unknown kpi_1, setting to TPS")
+            self.kpi_1 = self.rolling_tps
 
         self.in_kpi_2 = self.in_kpi_2.lower()
         if self.in_kpi_2 == "tps":
-            self.kpi_2_stable = self.rolling_tps.stable
-            self.kpi_2_list = self.rolling_tps.list
+            self.kpi_2 = self.rolling_tps
         elif self.in_kpi_2 == "cps":
-            self.kpi_2_stable = self.rolling_cps.stable
-            self.kpi_2_list = self.rolling_cps.list
+            self.kpi_2 = self.rolling_cps
         elif self.in_kpi_2 == "conns":
-            self.kpi_2_stable = self.rolling_conns.stable
-            self.kpi_2_list = self.rolling_conns.list
+            self.kpi_2 = self.rolling_conns
         elif self.in_kpi_2 == "bw":
-            self.kpi_2_stable = self.rolling_bw.stable
-            self.kpi_2_list = self.rolling_bw.list
+            self.kpi_2 = self.rolling_bw
         elif self.in_kpi_2 == "ttfb":
-            self.kpi_2_stable = self.rolling_ttfb.stable
-            self.kpi_2_list = self.rolling_ttfb.list
+            self.kpi_2 = self.rolling_ttfb
         else:
-            self.in_kpi_2 = None
+            log.debug(f"check_kpi unknown kpi_2, setting to CPS")
+            self.kpi_2 = self.rolling_cps
+
+    def check_ramp_seek_kpi(self):
+        if self.in_ramp_seek_kpi == "tps":
+            self.ramp_seek_kpi = self.rolling_tps
+        elif self.in_ramp_seek_kpi == "cps":
+            self.ramp_seek_kpi = self.rolling_cps
+        elif self.in_ramp_seek_kpi == "conns":
+            self.ramp_seek_kpi = self.rolling_conns
+        elif self.in_ramp_seek_kpi == "bw":
+            self.ramp_seek_kpi = self.rolling_bw
+        elif self.in_ramp_seek_kpi == "ttfb":
+            self.ramp_seek_kpi = self.rolling_ttfb
+        else:
+            log.debug(f"check_ramp_seek_kpi unknown kpi, setting to TPS")
+            self.ramp_seek_kpi = self.rolling_tps
 
     @staticmethod
     def return_bool_true(check_if, is_value):
@@ -1151,42 +1271,39 @@ class CfRunTest:
         if not self.wait_for_running_status():
             log.info(f"control_test end, wait_for_running_status False")
             return False
-            # exit control_test if test does not go into running state
+        # exit control_test if test does not go into running state
         if not self.wait_for_running_sub_status():
             log.info(f"control_test end, wait_for_running_sub_status False")
             return False
-        # exit control_test if test does have successful transactions
+        # exit control_test if test does not have successful transactions
         if not self.wait_for_test_activity():
             self.stop_wait_for_finished_status()
             log.info(f"control_test end, wait_for_test_activity False")
             return False
+        self.check_ramp_seek_kpi()
+        self.check_kpi()
+        self.rolling_count_since_goal_seek.reset()
+        self.countdown(12)
         # test control loop - runs until self.stop is set to True
         while not self.stop:
             self.update_run_stats()
             self.update_phase()
-            # stop test if time_remaining returned from controller == 0
-            if self.time_remaining == 0:
-                self.phase = "timeout"
-                log.info(f"control_test end, time_remaining == 0")
-                self.stop = True
-            # stop goal seeking test if time remaining is less than 30s
-            if self.time_remaining < 30 and self.in_goal_seek:
-                self.phase = "timeout"
-                log.info(f"control_test end, time_remaining < 30")
-                self.stop = True
-            if self.phase == "finished":
-                log.info(f"control_test end, over duration time > phase: finished")
-                self.stop = True
+            self.check_stop_conditions()
             self.update_rolling_averages()
-            self.check_kpi()
+
             # print stats if test is running
             if self.sub_status is None:
                 self.print_test_stats()
                 self.save_results()
+
+            if self.in_ramp_seek and not self.ramp_seek_complete:
+                log.info(f"control_test going to ramp_seek")
+                self.control_test_ramp_seek(self.ramp_seek_kpi, self.in_ramp_seek_value)
+
             if self.in_goal_seek:  # checks if goal seeking is selected for a test
-                # self.control_test_goal_seek()
-                self.control_test_goal_seek_kpi(self.kpi_1_stable, self.kpi_1_list,
-                                                self.kpi_2_stable, self.kpi_2_list, self.in_kpi_and_or)
+                log.info(f"control_test going to goal_seek")
+                self.control_test_goal_seek_kpi(self.kpi_1, self.kpi_2,
+                                                self.in_kpi_and_or)
             print(f"")
             time.sleep(4)
         # if goal_seek is yes enter sustained steady phase
@@ -1199,37 +1316,115 @@ class CfRunTest:
             return True
         return False
 
-    def control_test_goal_seek(self):
-        log.info(
-            f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
-            f"{self.rolling_count_since_goal_seek.list} "
-            f"tps_list stable: {self.rolling_tps.stable} {self.rolling_tps.list}"
-        )
-        if self.phase is not "goalseek":
-            log.info(f"phase {self.phase} is not 'goalseek', "
-                     f"returning from contol_test_goal_seek")
-            return
-        elif self.rolling_tps.stable and self.rolling_count_since_goal_seek.stable:
-            if self.max_load_reached:
-                log.info(f"control_test end, max_load_reached")
-                self.stop = True
-            else:
-                if self.goal_seek():
-                    # reset rolling count > no load increase until
-                    # at least the window size interval.
-                    # allows stats to stabilize after an increase
-                    self.rolling_count_since_goal_seek.reset()
-                else:
-                    log.info(f"control_test end, goal_seek False")
-                    self.stop = True
+    def check_stop_conditions(self):
+        log.debug(f"in check_stop_conditions method")
+        # stop test if time_remaining returned from controller == 0
+        if self.time_remaining == 0:
+            self.phase = "timeout"
+            log.info(f"control_test end, time_remaining == 0")
+            self.stop = True
+        # stop goal seeking test if time remaining is less than 30s
+        if self.time_remaining < 30 and self.in_goal_seek:
+            self.phase = "timeout"
+            log.info(f"control_test end goal_seek, time_remaining < 30")
+            self.stop = True
+        elif self.time_remaining < 30 and self.in_ramp_seek:
+            self.phase = "timeout"
+            log.info(f"control_test end ramp_seek, time_remaining < 30")
+            self.stop = True
+        if self.phase == "finished":
+            log.info(f"control_test end, over duration time > phase: finished")
+            self.stop = True
 
-    def control_test_goal_seek_kpi(self, kpi1_stable, kpi1_list,
-                                   kpi2_stable, kpi2_list, kpis_and_bool):
+    def control_test_ramp_seek(self, ramp_kpi, ramp_to_value):
+        """
+        Increases load to a configured tps, cps, conns or bandwidth level.
+        :return: True if no statements failed and there were no exceptions.
+        False otherwise.
+        """
+        ramp_seek_count = 1
+        #log.debug("Inside the RunTest/ramp_to_seek method.")
+        log.info(
+            f"Inside the RunTest/ramp_to_seek method.\n"
+            f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
+            f"list: {self.rolling_count_since_goal_seek.list} "
+            f"\nramp_to_value: {ramp_to_value} ramp_kpi avg: {ramp_kpi.avg_val}"
+            f" increase: {ramp_kpi.increase_avg}"
+            f"\n current load: {self.c_current_load}"
+            f" desired_load: {self.c_desired_load}"
+        )
+        if self.phase is not "rampseek":
+            log.info(f"phase {self.phase} is not 'rampseek', "
+                     f"returning from contol_test_ramp_seek")
+            return
+        if not self.rolling_count_since_goal_seek.stable:
+            log.info(f"count since goal seek is not stable. "
+                     f"count list: {self.rolling_count_since_goal_seek.list}"
+                     f"returning from control_test_ramp_seek")
+            return
+        if self.max_load_reached:
+            log.info(f"control_test_ramp_seek end, max_load_reached")
+            self.stop = True
+            return
+        # check if kpi avg is under set avg - if not, stop loop
+        if ramp_to_value < ramp_kpi.avg_val:
+            log.info(f"ramp_to_value {ramp_to_value} < ramp_kpi.avg_val {ramp_kpi.avg_val}"
+                     f"completed ramp_seek")
+            self.ramp_seek_complete = True
+            self.in_capacity_adjust = 1
+            return
+
+        if self.ramp_seek(ramp_kpi, ramp_to_value):
+            # reset rolling count > no load increase until
+            # at least the window size interval.
+            # allows stats to stabilize after an increase
+            self.rolling_count_since_goal_seek.reset()
+        else:
+            log.info(f"control_test_ramp_seek end, ramp_seek False")
+            self.ramp_seek_complete = True
+            self.in_capacity_adjust = 1
+            return
+
+        if (ramp_kpi.avg_val / ramp_to_value) > 0.9:
+            ramp_seek_count = ramp_seek_count + 1
+            if ramp_seek_count == 3:
+                self.ramp_seek_complete = True
+                self.in_capacity_adjust = 1
+                return
+        return
+
+    # def control_test_goal_seek(self):
+    #     # Replaced by control_test_goal_seek_kpi 1.71
+    #     log.info(
+    #         f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
+    #         f"{self.rolling_count_since_goal_seek.list} "
+    #         f"tps_list stable: {self.rolling_tps.stable} {self.rolling_tps.list}"
+    #     )
+    #     if self.phase is not "goalseek":
+    #         log.info(f"phase {self.phase} is not 'goalseek', "
+    #                  f"returning from contol_test_goal_seek")
+    #         return
+    #     elif self.rolling_tps.stable and self.rolling_count_since_goal_seek.stable:
+    #         if self.max_load_reached:
+    #             log.info(f"control_test end, max_load_reached")
+    #             self.stop = True
+    #         else:
+    #             if self.goal_seek():
+    #                 # reset rolling count > no load increase until
+    #                 # at least the window size interval.
+    #                 # allows stats to stabilize after an increase
+    #                 self.rolling_count_since_goal_seek.reset()
+    #             else:
+    #                 log.info(f"control_test end, goal_seek False")
+    #                 self.stop = True
+
+    def control_test_goal_seek_kpi(self, kpi_1,
+                                   kpi_2, kpis_and_bool):
         log.info(
             f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
             f"list: {self.rolling_count_since_goal_seek.list} "
-            f"\nKpi1 stable: {kpi1_stable} list: {kpi1_list}"
-            f"\nKpi2 stable: {kpi2_stable} list: {kpi2_list}"
+            f"\nKpi1 stable: {kpi_1.stable} list: {kpi_1.list}"
+            f"\nKpi2 stable: {kpi_2.stable} list: {kpi_2.list}"
         )
         if self.phase is not "goalseek":
             log.info(f"phase {self.phase} is not 'goalseek', "
@@ -1244,19 +1439,13 @@ class CfRunTest:
             self.stop = True
             return
 
-        # Set KPIs to stable if they are configured to None so goal seeking starts/continues
-        if self.in_kpi_1 is None:
-            kpi1_stable = True
-        if self.in_kpi_2 is None:
-            kpi2_stable = True
-
         if kpis_and_bool:
-            if kpi1_stable and kpi2_stable:
+            if kpi_1.stable and kpi_2.stable:
                 goal_seek = True
             else:
                 goal_seek = False
         else:
-            if kpi1_stable or kpi2_stable:
+            if kpi_1.stable or kpi_2.stable:
                 goal_seek = True
             else:
                 goal_seek = False
