@@ -9,7 +9,7 @@ import pathlib
 import sys
 import math
 
-script_version = 1.71
+script_version = 1.72
 
 project_dir = pathlib.Path().absolute().parent
 sys.path.append(str(project_dir))
