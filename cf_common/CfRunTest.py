@@ -9,7 +9,7 @@ import pathlib
 import sys
 import math
 
-script_version = 1.73
+script_version = 1.75
 
 project_dir = pathlib.Path().absolute().parent
 sys.path.append(str(project_dir))
@@ -939,11 +939,11 @@ class CfRunTest:
             self.timer = int(round(time.time() - self.start_time))
             self.update_test_run()
             self.update_run_stats()
-            self.print_test_status()
+            # self.print_test_status()
 
-            # moved to wait_for_running_sub_status function
-            # if self.sub_status is None:
-            #     self.print_test_stats()
+            if self.sub_status is None:
+                self.print_test_stats()
+                self.save_results()
 
             if self.c_http_successful_txns_sec > 0:
                 test_generates_activity = True

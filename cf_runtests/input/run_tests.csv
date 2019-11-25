@@ -1,8 +1,8 @@
 name,id,type,run,run_order,goal_seek,ramp_seek,ramp_kpi,ramp_value,duration,startup,rampup,rampdown,shutdown,sustain_period,kpi_1,kpi_2,kpi_and_or,load_type,start_load,incr_low,incr_med,incr_high,low_threshold,med_threshold,high_threshold,variance_sample_size,max_variance,capacity_adj
 T02-HTTP-CPS-1K_mqr,d93248ba37ea0f3ef519ec80f3fc7baa,http_connections_per_second,Y,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,7,7,5,3,20,5,1,3,0.03,auto
-T03-HTTP-TPUT-256K_mqr,d93248ba37ea0f3ef519ec80f3fc78d6,http_throughput,Y,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,1,1,1,1,20,5,1,3,0.03,auto
-T06-TLS-CPS-EC-RSA2K-A128-GCM-S2-1K_mqr,a55ac6616952158117a78a90c51c81aa,http_connections_per_second,Y,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,20,20,12,9,20,5,1,3,0.03,auto
-T06-TLS-CPS-13-EC-RSA2K-A128-GCM-S2-1K_mqr,a55ac6616952158117a78a90c51c7e8e,http_connections_per_second,Y,10,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,1,1,1,1,20,5,1,3,0.03,auto
-T07-TLS-TPUT-EC-RSA2K-A128-GCM-S2-R1K-256K_mqr,a55ac6616952158117a78a90c51c7584,http_throughput,Y,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,2,2,1,1,20,5,1,3,0.03,auto
-T07-TLS-TPUT-EC-RSA2K-A128-GCM-S2-256K_mqr,a55ac6616952158117a78a90c51c7406,http_throughput,Y,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,2,2,1,1,20,5,1,3,0.03,auto
-T05-HTTP-CON-1K_mqr,a55ac6616952158117a78a90c51c698e,open_connections,Y,3,N,N,cps,1000,1500,5,480,480,55,0,None,None,OR,simusers,12000,6,4,3,20,5,1,3,0.03,auto
+T03-HTTP-TPUT-256K_mqr,d93248ba37ea0f3ef519ec80f3fc78d6,http_throughput,N,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,1,1,1,1,20,5,1,3,0.03,auto
+T06-TLS-CPS-EC-RSA2K-A128-GCM-S2-1K_mqr,a55ac6616952158117a78a90c51c81aa,http_connections_per_second,N,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,20,20,12,9,20,5,1,3,0.03,auto
+T06-TLS-CPS-13-EC-RSA2K-A128-GCM-S2-1K_mqr,a55ac6616952158117a78a90c51c7e8e,http_connections_per_second,N,10,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,1,1,1,1,20,5,1,3,0.03,auto
+T07-TLS-TPUT-EC-RSA2K-A128-GCM-S2-R1K-256K_mqr,a55ac6616952158117a78a90c51c7584,http_throughput,N,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,2,2,1,1,20,5,1,3,0.03,auto
+T07-TLS-TPUT-EC-RSA2K-A128-GCM-S2-256K_mqr,a55ac6616952158117a78a90c51c7406,http_throughput,N,1,Y,N,cps,1000,1800,5,30,10,10,30,tps,cps,OR,simusers,2,2,1,1,20,5,1,3,0.03,auto
+T05-HTTP-CON-1K_mqr,a55ac6616952158117a78a90c51c698e,open_connections,N,3,N,N,cps,1000,1500,5,480,480,55,0,None,None,OR,simusers,12000,6,4,3,20,5,1,3,0.03,auto
