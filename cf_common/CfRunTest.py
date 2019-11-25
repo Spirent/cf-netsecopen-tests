@@ -1541,6 +1541,7 @@ class CfRunTest:
             self.time_to_start,
             self.time_to_activity,
             self.time_to_stop,
+            script_version,
             self.report_link,
         ]
         self.result_file.append_file(csv_list)
@@ -1604,6 +1605,7 @@ class DetailedCsvReport:
             "t_start",
             "t_tx",
             "t_stop",
+            "version",
             "report",
         ]
 
@@ -1717,10 +1719,12 @@ class Report:
             d["max_tps_seconds"] = self.df_base.loc[
                 self.df_base["tps"] == d["tps_max"], "seconds"
             ].iloc[0]
+            # get script version from test
+            d["version"] = self.df_base.loc[self.df_base["test_name"] == name, "version"].iloc[0]
+
             # get report link for current test
-            d["report"] = self.df_base.loc[
-                self.df_base["tps"] == d["tps_max"], "report"
-            ].iloc[0]
+            # d["report"] = self.df_base.loc[self.df_base["tps"] == d["tps_max"], "report"].iloc[0]
+            d["report"] = self.df_base.loc[self.df_base["test_name"] == name, "report"].iloc[-1]
 
             # find min and max tps from steady phase
             max_steady_compare = ["tps"]
@@ -1968,6 +1972,7 @@ class Report:
             "t_start": {"width": "3em", "min-width": "3em", "text-align": "right"},
             "t_tx": {"width": "3em", "min-width": "3em", "text-align": "right"},
             "t_stop": {"width": "3em", "min-width": "3em", "text-align": "right"},
+            "version": {"width": "3em", "min-width": "3em", "text-align": "right"},
         }
 
         # html = ''

@@ -53,7 +53,7 @@ col_order = ['test_name', 'cps', 'tps', 'total_bandwidth', 'open_conns',
              'total_bandwidth_max', 'report',
              'client_cpu', 'server_cpu', 'client_pkt_mem', 'server_pkt_mem',
              'client_rcv_queue', 'server_rcv_queue',
-             "t_run", "t_start", "t_tx", "t_stop",
+             "t_run", "t_start", "t_tx", "t_stop", "version",
              ]
 html_additional_reports = {
     'sum': ['test_name', 'cps', 'tps', 'total_bandwidth', 'open_conns'],
