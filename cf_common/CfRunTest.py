@@ -1722,7 +1722,7 @@ class Report:
             # get script version from test
             d["version"] = self.df_base.loc[self.df_base["test_name"] == name, "version"].iloc[0]
 
-            # get report link for current test
+            # get report link for current test - changed to take from last row in test
             # d["report"] = self.df_base.loc[self.df_base["tps"] == d["tps_max"], "report"].iloc[0]
             d["report"] = self.df_base.loc[self.df_base["test_name"] == name, "report"].iloc[-1]
 
