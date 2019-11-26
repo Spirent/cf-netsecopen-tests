@@ -179,7 +179,11 @@ class CfRunTest:
                                                 {"true", "y", "yes"})
         self.in_ramp_seek_kpi = test_details.get("ramp_kpi", "tps")
         self.in_ramp_seek_value = int(test_details.get("ramp_value", 1))
-        self.ramp_seek_complete = False
+        self.in_ramp_step = int(test_details.get("ramp_step", 1))
+        if not self.in_ramp_seek:
+            self.ramp_seek_complete = True
+        else:
+            self.ramp_seek_complete = False
 
         self.in_goal_seek = False
         self.first_steady_interval = True
@@ -957,6 +961,7 @@ class CfRunTest:
                 log.error(error_msg)
                 print(error_msg)
                 return False
+            print(f"")
         self.time_to_activity = self.timer - self.time_to_start - self.time_to_run
         return True
 
@@ -1011,7 +1016,7 @@ class CfRunTest:
         # log.info(log_msg)
         # print(log_msg)
 
-        self.change_update_load(new_load)
+        self.change_update_load(new_load, 16)
 
         # try:
         #     self.cf.change_load(self.id, new_load)
@@ -1037,19 +1042,29 @@ class CfRunTest:
         # if self.first_ramp_load_increase:
         #     self.first_ramp_load_increase = False
         #     new_load = self.c_current_load * 2
+
+        if self.in_ramp_step < 1:
+            self.ramp_seek_complete = True
+            return
         if ramp_kpi.avg_val < ramp_to_value:
-            load_increase = round(ramp_to_value / ramp_kpi.avg_val, 3)
-            # new_load = math.ceil(self.c_current_load * load_increase)
-            new_load = self.round_up_to_even(self.c_current_load * load_increase)
-            log.info(f"new load: {new_load}, current_load: {self.c_current_load} "
-                     f" * {load_increase} load_increase"
+            load_increase_multiple = round(ramp_to_value / ramp_kpi.avg_val, 3)
+            load_increase = (self.c_current_load * load_increase_multiple) - self.c_current_load
+            load_increase = round(load_increase / self.in_ramp_step, 3)
+            new_load = self.round_up_to_even(self.c_current_load + load_increase)
+            self.in_ramp_step = self.in_ramp_step - 1
+
+            log.info(f"new load: {new_load}, current_load: {self.c_current_load}"
+                     f" * {load_increase} load_increase "
+                     f"ramp_step left: {self.in_ramp_step} "
                      f"\n ramp_to_value: {ramp_to_value} "
                      f"ramp_kpi.avg_val: {ramp_kpi.avg_val}"
                      )
             self.in_incr_low = self.round_up_to_even(new_load * 0.6)
             self.in_incr_med = self.round_up_to_even(new_load * 0.5)
             self.in_incr_high = self.round_up_to_even(new_load * 0.4)
-        self.change_update_load(new_load)
+        else:
+            self.ramp_seek_complete = True
+        self.change_update_load(new_load, 16)
         return True
 
     @staticmethod
@@ -1073,7 +1088,7 @@ class CfRunTest:
             return True
         return False
 
-    def change_update_load(self, new_load):
+    def change_update_load(self, new_load, count_down):
         new_load = self.round_up_to_even(new_load)
         log_msg = f"\nchanging load from: {self.c_current_load} to: {new_load}  status: {self.status}"
         log.info(log_msg)
@@ -1090,7 +1105,7 @@ class CfRunTest:
             log.error(
                 f"Exception occurred when changing test: " f"\n<{detailed_exception}>"
             )
-        self.countdown(20)
+        self.countdown(count_down)
         return True
 
     def goal_seek_set_default(self):
@@ -1300,7 +1315,7 @@ class CfRunTest:
                 log.info(f"control_test going to ramp_seek")
                 self.control_test_ramp_seek(self.ramp_seek_kpi, self.in_ramp_seek_value)
 
-            if self.in_goal_seek:  # checks if goal seeking is selected for a test
+            if self.in_goal_seek and self.ramp_seek_complete:
                 log.info(f"control_test going to goal_seek")
                 self.control_test_goal_seek_kpi(self.kpi_1, self.kpi_2,
                                                 self.in_kpi_and_or)
@@ -1494,6 +1509,7 @@ class CfRunTest:
             self.phase,
             self.c_current_load,
             self.c_desired_load,
+            self.rolling_count_since_goal_seek.stable,
             self.c_http_successful_txns_sec,
             self.rolling_tps.stable,
             self.rolling_tps.increase_avg,
@@ -1558,6 +1574,7 @@ class DetailedCsvReport:
             "state",
             "current_load",
             "desired_load",
+            "seek_ready",
             "tps",
             "tps_stable",
             "tps_delta",
