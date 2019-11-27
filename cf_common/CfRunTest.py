@@ -173,9 +173,9 @@ class CfRunTest:
         self.in_sustain_period = int(test_details["sustain_period"])
         self.variance_sample_size = int(test_details["variance_sample_size"])
         self.in_max_variance = float(test_details["max_variance"])
-        self.in_ramp_low = int(test_details.get("ramp_low", 40))
-        self.in_ramp_med = int(test_details.get("ramp_med", 20))
-        self.in_ramp_high = int(test_details.get("ramp_high", 10))
+        self.in_ramp_low = int(test_details.get("ramp_low", 60))
+        self.in_ramp_med = int(test_details.get("ramp_med", 40))
+        self.in_ramp_high = int(test_details.get("ramp_high", 20))
 
         self.in_ramp_seek = self.if_in_set_true(test_details, "ramp_seek",
                                                 {"true", "y", "yes"})
@@ -1120,36 +1120,6 @@ class CfRunTest:
                 set_load = self.in_threshold_high
         return set_load
 
-    # def goal_seek_set_simuser(self):
-    #     # Replaced by goal_seek_set_simuser_kpi
-    #     log.debug(f"in goal_seek_set_simuser function")
-    #     set_load = 0
-    #     if self.rolling_tps.increase_avg >= self.in_threshold_low:
-    #         set_load = self.c_current_load + (
-    #             self.in_incr_low * self.in_capacity_adjust
-    #         )
-    #     elif self.rolling_tps.increase_avg >= self.in_threshold_med:
-    #         set_load = self.c_current_load + (
-    #             self.in_incr_med * self.in_capacity_adjust
-    #         )
-    #     elif self.rolling_tps.increase_avg >= self.in_threshold_high:
-    #         set_load = self.c_current_load + (
-    #             self.in_incr_high * self.in_capacity_adjust
-    #         )
-    #     elif self.rolling_tps.increase_avg < self.in_threshold_high:
-    #         log.info(
-    #             f"rolling_tps.increase_avg < in_threshold_high, "
-    #             f"{self.rolling_tps.increase_avg} < {self.in_threshold_high}"
-    #         )
-    #         return False
-    #     if self.rolling_tps.avg_max_load_variance < 0.97:
-    #         set_load = self.c_current_load
-    #         self.max_load_reached = True
-    #     log.info(
-    #         f"set_load = {set_load}  rolling_tps.avg_max_load_variance: {self.rolling_tps.avg_max_load_variance}"
-    #     )
-    #     return set_load
-
     def goal_seek_set_simuser_kpi(self, kpi):
         log.debug(f"in goal_seek_set_simuser_kpi function")
         set_load = 0
@@ -1256,7 +1226,6 @@ class CfRunTest:
         if isinstance(check_if, str) and check_if.lower() == is_value:
             return True
         return False
-
 
     def control_test(self):
         """Main test control
@@ -1398,31 +1367,6 @@ class CfRunTest:
                 self.in_capacity_adjust = 1
                 return
         return
-
-    # def control_test_goal_seek(self):
-    #     # Replaced by control_test_goal_seek_kpi 1.71
-    #     log.info(
-    #         f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
-    #         f"{self.rolling_count_since_goal_seek.list} "
-    #         f"tps_list stable: {self.rolling_tps.stable} {self.rolling_tps.list}"
-    #     )
-    #     if self.phase is not "goalseek":
-    #         log.info(f"phase {self.phase} is not 'goalseek', "
-    #                  f"returning from contol_test_goal_seek")
-    #         return
-    #     elif self.rolling_tps.stable and self.rolling_count_since_goal_seek.stable:
-    #         if self.max_load_reached:
-    #             log.info(f"control_test end, max_load_reached")
-    #             self.stop = True
-    #         else:
-    #             if self.goal_seek():
-    #                 # reset rolling count > no load increase until
-    #                 # at least the window size interval.
-    #                 # allows stats to stabilize after an increase
-    #                 self.rolling_count_since_goal_seek.reset()
-    #             else:
-    #                 log.info(f"control_test end, goal_seek False")
-    #                 self.stop = True
 
     def control_test_goal_seek_kpi(self, kpi_1,
                                    kpi_2, kpis_and_bool):
