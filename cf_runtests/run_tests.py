@@ -57,4 +57,4 @@ for test in test_list:
             new_name = file_name + "_" + k
             report_file = pathlib.Path(file_path / new_name).with_suffix(".html")
             print(report_file)
-            html_report(table, report_tables, report_file, v)
+            html_report(table, report_tables, report_file, v, script_version)

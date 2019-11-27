@@ -25,7 +25,8 @@ def verify_directory_structure(bool_project_dir, input_dir, output_dir, report_d
     return input_dir, output_dir, report_dir
 
 
-def html_report(df_table, sub_report_tables, html_report_file, filter_columns):
+def html_report(df_table, sub_report_tables, html_report_file, filter_columns,
+                script_version):
     html = ""
     for sub_table in sub_report_tables:
         df_table.reset_df_filter()
@@ -38,6 +39,13 @@ def html_report(df_table, sub_report_tables, html_report_file, filter_columns):
             else:
                 table_filter = f"<h3>{sub_table}</h3>"
             html = html + table_filter + df_table.html_table(df_table.style_a())
+
+    script_version_html = f"\n<body>" \
+                          f"\n<p>Script version: {script_version}</p>" \
+                          f"\n</body>"
+
+    html = html + script_version_html
+
     with open(html_report_file, "w") as f:
         f.write(html)
 

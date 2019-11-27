@@ -51,6 +51,7 @@ class CfCreateTest(BaseTest):
         self.supportedGroups = self.chk_none(test_info["supportedGroups"])
         self.signature_hash = self.chk_none(test_info["signature_hash"])
         self.tls_record = self.chk_none(test_info["tls_record"])
+        self.payload_encryption_offload = test_info["payloadEncryptionOffload"]
         self.http_method = self.chk_none(test_info["http_method"])
         self.post_size = self.chk_none(test_info["post_size"])
         self.name_suffix = test_info["name_suffix"]
@@ -259,6 +260,7 @@ class CfCreateTest(BaseTest):
         supported_groups,
         signature_hash,
         tls_record,
+        payload_encryption_offload,
     ):
         if tls.lower() in {"true"}:
             tls = True
@@ -279,12 +281,20 @@ class CfCreateTest(BaseTest):
         if signature_hash is not None:
             self.update_tls_signature_hash(signature_hash)
 
+        self.update_tls_payload_encryption_offload(payload_encryption_offload)
+
     def update_tls_base_setting(self, tls_version, tls_record):
         try:
             self.protocol["port"] = 443
         except Exception as e:
             print(f"\nUnable to set sslTls enabled state \n{e}")
         if self.tls_version is not None:
+            try:
+                # Reset tlsv12 and tlsv13 back to false
+                self.protocol["supplemental"]["sslTls"]["tlsv12"] = False
+                self.protocol["supplemental"]["sslTls"]["tlsv13"] = False
+            except Exception as e:
+                print(f"\nUnable to set reset tls_version settings \n{e}")
             try:
                 # using tls_version as var to set right tls key to true
                 self.protocol["supplemental"]["sslTls"][tls_version] = True
@@ -356,6 +366,24 @@ class CfCreateTest(BaseTest):
         except Exception as e:
             print(f"\nUnable to set TLS signature hash \n{e}")
 
+    def update_tls_payload_encryption_offload(self, payload_encryption_offload):
+        if self.cf_version < 19400000:
+            log.info(
+                f"Not setting payloadEncryptionOffload. "
+                f"CF version is below {19400000}"
+            )
+            return
+        if payload_encryption_offload.lower() in {"true"}:
+            payload_encryption_offload = True
+        elif payload_encryption_offload.lower() in {"false"}:
+            payload_encryption_offload = False
+        try:
+            self.protocol["supplemental"]["sslTls"][
+                "payloadEncryptionOffload"
+            ] = payload_encryption_offload
+        except Exception as e:
+            print(f"\nUnable to set payloadEncryptionOffload state \n{e}")
+
     @staticmethod
     def chk_none(value):
         if isinstance(value, (int, float)):
@@ -391,6 +419,7 @@ class CfCreateTest(BaseTest):
                 self.supportedGroups,
                 self.signature_hash,
                 self.tls_record,
+                self.payload_encryption_offload,
             )
 
 
