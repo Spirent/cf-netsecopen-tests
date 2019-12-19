@@ -187,6 +187,12 @@ class CfRunTest:
         else:
             self.ramp_seek_complete = False
 
+        self.living_simusers_max_bool = self.check_if_number(
+            test_details.get("living_simusers_max", False))
+        self.living_simusers_max = self.return_int_if_present(
+            self.living_simusers_max_bool,
+            test_details.get("living_simusers_max", False))
+
         self.in_goal_seek = False
         self.first_steady_interval = True
         self.in_goal_seek = test_details["goal_seek"]
@@ -220,8 +226,7 @@ class CfRunTest:
             self.client_core_count,
         )
         log.info(f"in_capacity_adjust: {self.in_capacity_adjust}")
-        # self.load_constraints = self.test_config["config"]["loadSpecification"][
-        #     "constraints"]
+        self.load_constraints = {"enabled": False}
         if not self.update_config_load():
             report_error = f"unknown load_type with test type"
             log.debug(report_error)
@@ -375,6 +380,20 @@ class CfRunTest:
                 return True
         return False
 
+    @staticmethod
+    def check_if_number(in_value):
+        if isinstance(in_value, int) or isinstance(in_value, float):
+            return True
+        if isinstance(in_value, str):
+            if in_value.isdigit():
+                return True
+        return False
+
+    @staticmethod
+    def return_int_if_present(present, value):
+        if present:
+            return int(value)
+
     def get_test_config(self):
         try:
             response = self.cf.get_test(
@@ -450,7 +469,7 @@ class CfRunTest:
             return False
 
         self.in_start_load = int(self.in_start_load) * self.in_capacity_adjust
-
+        self.update_load_constraints()
         load_update = {
             "config": {
                 "loadSpecification": {
@@ -461,8 +480,8 @@ class CfRunTest:
                     "shutdown": int(self.in_shutdown),
                     load_key: int(self.in_start_load),
                     "type": self.in_load_type,
-                    # "constraints": self.load_constraints,
-                    "constraints": {"enabled": False},
+                    "constraints": self.load_constraints,
+                    # "constraints": {"enabled": False},
                 }
             }
         }
@@ -475,6 +494,27 @@ class CfRunTest:
 
         log.info(f"{json.dumps(response, indent=4)}")
         return True
+
+    def update_load_constraints(self):
+        living = {"enabled": False}
+        open_connections = {"enabled": False}
+        birth_rate = {"enabled": False}
+        connections_rate = {"enabled": False}
+
+        if self.living_simusers_max_bool:
+            constraints = True
+            living = {
+                "enabled": True,
+                "max": self.living_simusers_max
+            }
+        if constraints:
+            self.load_constraints = {
+                "enabled": True,
+                "living": living,
+                "openConnections": open_connections,
+                "birthRate": birth_rate,
+                "connectionsRate": connections_rate,
+            }
 
     def test_type(self):
         if self.type_v2 == "http_throughput":
