@@ -500,6 +500,7 @@ class CfRunTest:
         open_connections = {"enabled": False}
         birth_rate = {"enabled": False}
         connections_rate = {"enabled": False}
+        constraints = False
 
         if self.living_simusers_max_bool:
             constraints = True
