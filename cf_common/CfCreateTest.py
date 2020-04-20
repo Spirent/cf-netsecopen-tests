@@ -65,6 +65,10 @@ class CfCreateTest(BaseTest):
         self.loadSpecification = test_template["config"]["loadSpecification"]
 
         self.cf_version = int("".join(i for i in cf_ver if i.isdigit()))
+        self.cf_version = str(self.cf_version)
+        self.cf_version = self.cf_version.ljust(8, '0')
+        self.cf_version = int(self.cf_version)
+        log.info(f"cf_version {self.cf_version}")
 
     def complete_test(self):
         comp_test = {}
