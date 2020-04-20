@@ -65,6 +65,6 @@ set PYTHONPATH=%PYTHONPATH%;C:\path\to\cf-netsecopen-tests
 - ramp_low: percentage of load at ramp_seek complete phase to set goal seek incr_low value. Only used with ramp_seek and goal_seek. Default 60(%).
 - ramp_med: percentage of load at ramp_seek complete phase to set goal seek incr_med value. Only used with ramp_seek and goal_seek. Default 40(%).
 - ramp_high: percentage of load at ramp_seek complete phase to set goal seek incr_high value. Only used with ramp_seek and goal_seek. Default 20(%).
-
+- living_simusers_max: none (default) or maximum number of living simusers in a test. Can be useful in Simusers/Second load spec to prevent tests from failing.
 
 
