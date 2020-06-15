@@ -1,3 +1,22 @@
+# Python byte code
+*.pyc
+
+# Log files
+*.log
+cf_runtests/report/
+.history/
+cf_runtests/output/base_test_config.json
+cf_runtests/output/last_created_test.json
+cf_runtests/output/last_deleted_test.json
+cf_runtests/output/running_test_config.json
+cf_runtests/output/template_last_created.json
+cf_runtests/output/test_load_update.json
+cf_runtests/output/created_tests.csv
+
+# Debug files
+dev_settings.py
+create_tests_temp.csv
+
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
@@ -31,3 +50,4 @@ atlassian-ide-plugin.xml
 
 # Editor-based Rest Client
 .idea/httpRequests
+
