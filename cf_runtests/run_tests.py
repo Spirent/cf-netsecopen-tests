@@ -38,9 +38,14 @@ print(f"Report location: {html_report_file}")
 for test in test_list:
     if test["run"].lower() in {"y", "yes", "true"}:
         print(f"\ntest details:\n{json.dumps(test, indent=4)}")
-        rt = CfRunTest(cf, test, detailed_report, output_dir)
+        # rt = CfRunTest(cf, test, detailed_report, output_dir)
+        # if rt is not False:
+        #     rt.control_test()
+        rd = RunData()
+        rt = CfRunTest(cf, rd, test, detailed_report, output_dir)
         if rt is not False:
-            rt.control_test()
+            rt.init_sequence(cf, rd, test)
+            rt.control_test(cf, rd)
         # create reports
         table = Report(detailed_report.report_csv_file, col_order)
         file_name = detailed_report.report_csv_file.stem

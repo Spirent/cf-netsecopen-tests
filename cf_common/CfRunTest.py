@@ -9,7 +9,9 @@ import pathlib
 import sys
 import math
 
-script_version = 1.79
+from dataclasses import dataclass
+
+script_version = 1.80
 
 project_dir = pathlib.Path().absolute().parent
 sys.path.append(str(project_dir))
@@ -140,237 +142,342 @@ class RollingStats:
         if self.new_high:
             return True
         if not self.new_high:
-            return False
+            return False 
 
+@dataclass
+class RunData:
+    """Data class with default values used by RunTest"""
+    test_id: str = 'test_id'
+    type_v2: str = 'test_type'
+    in_name: str = 'test_name'
+    in_run: str = 'Y'
+    in_load_type: str = 'loadspec_type'
+    in_start_load: int = 7
+    in_incr_low: int = 7
+    in_incr_med: int = 5
+    in_incr_high: int = 3
+    in_duration: int = 1800
+    in_startup: int = 5
+    in_rampup: int = 10
+    in_rampdown: int = 10
+    in_shutdown: int = 10
+    in_sustain_period: int = 30
+    in_kpi_1: str = 'tps'
+    in_kpi_2: str = 'cps'
+    in_kpi_and_or: str = 'AND'
+    in_threshold_low: float = 20.0
+    in_threshold_med: float = 5.0
+    in_threshold_high: float= 1.0
+    variance_sample_size: int = 3
+    in_max_variance: float = 0.03
+    in_ramp_low: int = 60
+    in_ramp_med: int = 40
+    in_ramp_high: int = 20
+    in_ramp_seek: bool = False
+    in_ramp_seek_kpi: str = 'cps'
+    in_ramp_seek_value: int = 1000
+    in_ramp_step: int = 5
+    ramp_seek_complete: bool = True
+
+    living_simusers_max_bool: bool = False
+    living_simusers_max: int = 1 
+
+    in_goal_seek: bool = False
+    first_steady_interval: bool = True
+
+    test_config: dict = None
+    queue_id: str = 'id'
+    queue_info: dict = None
+    queue_capacity: int = 60
+    core_count: int = 6
+    client_port_count: int = 1
+    server_port_count: int = 1
+    client_core_count: int = 3
+    in_capacity_adjust: any = 1
+    load_constraints: dict = None
+
+    test_run: dict = None
+    test_run_update: dict = None
+
+    id: dict = None
+    score: str = ''
+    grade: str = ''
+    run_id: str = 'Test_name'
+    status: str = 'status'  # main run status 'running'
+    name: str = 'name'
+    type_v1: str = 'type_v1'
+    sub_status: str = None
+    created_at: str = None
+    updated_at: str = None
+    started_at: str = None
+    finished_at: str = None
+    run_link: str = 'runlink'
+    report_link = None
+    sub_status = None  # subStatus -  none while running or not started
+    progress: int = 0  # progress  -  0-100
+    time_elapsed: int = 0  # timeElapsed  - seconds
+    time_remaining: int = 0  # timeRemaining  - seconds
+
+    c_rx_bandwidth: int = 0
+    c_rx_packet_count: int = 0
+    c_rx_packet_rate: int = 0
+    c_tx_bandwidth: int = 0
+    c_tx_packet_count: int = 0
+    c_tx_packet_rate: int = 0
+    c_http_aborted_txns: int = 0
+    c_http_aborted_txns_sec: int = 0
+    c_http_attempted_txns: int = 0
+    c_http_attempted_txns_sec: int = 0
+    c_http_successful_txns: int = 0
+    c_http_successful_txns_sec: int = 0
+    c_http_unsuccessful_txns: int = 0
+    c_http_unsuccessful_txns_sec: int = 0
+    c_loadspec_avg_idle: int = 0
+    c_loadspec_avg_cpu: int = 0
+    c_memory_main_size: int = 0
+    c_memory_main_used: int = 0
+    c_memory_packetmem_used: int = 0
+    c_memory_rcv_queue_length: int = 0
+    c_simusers_alive: int = 0
+    c_simusers_animating: int = 0
+    c_simusers_blocking: int = 0
+    c_simusers_sleeping: int = 0
+    c_tcp_avg_ttfb: int = 0
+    c_tcp_avg_tt_synack: int = 0
+    c_tcp_cumulative_attempted_conns: int = 0
+    c_tcp_cumulative_established_conns: int = 0
+    c_url_avg_response_time: int = 0
+    c_tcp_attempted_conn_rate: int = 0
+    c_tcp_established_conn_rate: int = 0
+    c_tcp_attempted_conns: int = 0
+    c_tcp_established_conns: int = 0
+    c_current_load: int = 0
+    c_desired_load: int = 0
+    c_total_bandwidth: int = 0
+    c_memory_percent_used: int = 0
+    c_current_desired_load_variance: float = 0.0
+    c_current_max_load_variance: float = 0.0
+    c_transaction_error_percentage: float = 0.0
+
+    s_rx_bandwidth: int = 0
+    s_rx_packet_count: int = 0
+    s_rx_packet_rate: int = 0
+    s_tx_bandwidth: int = 0
+    s_tx_packet_count: int = 0
+    s_tx_packet_rate: int = 0
+    s_memory_main_size: int = 0
+    s_memory_main_used: int = 0
+    s_memory_packetmem_used: int = 0
+    s_memory_rcv_queue_length: int = 0
+    s_memory_avg_cpu: int = 0
+    s_tcp_closed_error: int = 0
+    s_tcp_closed: int = 0
+    s_tcp_closed_reset: int = 0
+    s_memory_percent_used: int = 0
+
+    first_ramp_load_increase: bool = True
+    first_goal_load_increase: bool = True
+    max_load_reached: bool = False
+    max_load: int = 0
+    stop: bool = False  # test loop control
+    phase: str = None  # time phase of test: ramp up, steady ramp down
+
+    # rolling statistics
+    rolling_sample_size: int = 3
+    max_var_reference: float = 0.03
+    rolling_tps: RollingStats = None
+    rolling_ttfb: RollingStats = None
+    rolling_current_load: RollingStats = None
+    rolling_count_since_goal_seek: RollingStats = None
+    rolling_cps: RollingStats = None
+    rolling_conns: RollingStats = None
+    rolling_bw: RollingStats = None
+
+    kpi_1: any = None
+    kpi_2: any = None
+    kpi_1_stable: bool = True
+    kpi_2_stable: bool = True
+    kpi_1_list: list = None
+    kpi_2_list: list = None
+    ramp_seek_kpi: any = None
+
+    start_time: any = None
+    timer: any = None
+    time_to_run: int = 0
+    time_to_start: int = 0
+    time_to_activity: int = 0
+    time_to_stop_start: int = 0
+    time_to_stop: int = 0
+    test_started: bool = False
 
 class CfRunTest:
-    def __init__(self, cf, test_details, result_file, temp_file_dir):
+    def __init__(self, cf, rd, test_details, result_file, temp_file_dir):
         log.info(f"script version: {script_version}")
         self.cf = cf  # CfClient instance
         self.result_file = result_file
         self.temp_dir = temp_file_dir
-        self.test_id = test_details["id"]
-        self.type_v2 = test_details["type"]
-        self.in_name = test_details["name"]
-        self.in_run = test_details["run"]
-        self.in_load_type = test_details["load_type"]
-        self.in_start_load = test_details["start_load"]
-        self.in_incr_low = int(test_details["incr_low"])
-        self.in_incr_med = int(test_details["incr_med"])
-        self.in_incr_high = int(test_details["incr_high"])
-        self.in_duration = int(test_details["duration"])
-        self.in_startup = int(test_details["startup"])
-        self.in_rampup = int(test_details["rampup"])
-        self.in_rampdown = int(test_details["rampdown"])
-        self.in_shutdown = int(test_details["shutdown"])
-        self.in_sustain_period = int(test_details["sustain_period"])
-        self.in_kpi_1 = test_details.get("kpi_1", "tps")
-        self.in_kpi_2 = test_details.get("kpi_2", "cps")
-        self.in_kpi_and_or = self.return_bool_true(test_details.get("kpi_and_or"), "AND")
-        self.in_threshold_low = float(test_details["low_threshold"])
-        self.in_threshold_med = float(test_details["med_threshold"])
-        self.in_threshold_high = float(test_details["high_threshold"])
-        self.in_sustain_period = int(test_details["sustain_period"])
-        self.variance_sample_size = int(test_details["variance_sample_size"])
-        self.in_max_variance = float(test_details["max_variance"])
-        self.in_ramp_low = int(test_details.get("ramp_low", 60))
-        self.in_ramp_med = int(test_details.get("ramp_med", 40))
-        self.in_ramp_high = int(test_details.get("ramp_high", 20))
 
-        self.in_ramp_seek = self.if_in_set_true(test_details, "ramp_seek",
+    def init_sequence(self, cf, rd, test_details):
+        self.init_input_csv(rd, test_details)
+
+        rd.test_config = self.get_test_config(cf, rd)
+        rd.queue_id = rd.test_config["config"]["queue"]["id"]
+        rd.queue_info = self.get_queue(rd.queue_id)
+
+        self.init_capacity_adj(rd)
+
+        self.init_update_config_load(rd)
+        self.update_config_load_controller(cf, rd)
+
+        rd.test_run = self.start_test_run(cf, rd)
+        self.init_test_run(rd, cf.controller_ip)
+
+        self.init_rolling_stats(rd)
+        # create entry in result file at the start of test
+        self.save_results(rd)
+
+    def init_input_csv(self, rd, test_details):
+        rd.test_id = test_details["id"]
+        rd.type_v2 = test_details["type"]
+        rd.in_name = test_details["name"]
+        rd.in_run = test_details["run"]
+        rd.in_load_type = test_details["load_type"]
+        rd.in_start_load = test_details["start_load"]
+        rd.in_incr_low = int(test_details["incr_low"])
+        rd.in_incr_med = int(test_details["incr_med"])
+        rd.in_incr_high = int(test_details["incr_high"])
+        rd.in_duration = int(test_details["duration"])
+        rd.in_startup = int(test_details["startup"])
+        rd.in_rampup = int(test_details["rampup"])
+        rd.in_rampdown = int(test_details["rampdown"])
+        rd.in_shutdown = int(test_details["shutdown"])
+        rd.in_sustain_period = int(test_details["sustain_period"])
+        rd.in_kpi_1 = test_details.get("kpi_1", "tps")
+        rd.in_kpi_2 = test_details.get("kpi_2", "cps")
+        rd.in_kpi_and_or = self.return_bool_true(test_details.get("kpi_and_or"), "AND")
+        rd.in_threshold_low = float(test_details["low_threshold"])
+        rd.in_threshold_med = float(test_details["med_threshold"])
+        rd.in_threshold_high = float(test_details["high_threshold"])
+        rd.in_sustain_period = int(test_details["sustain_period"])
+        rd.variance_sample_size = int(test_details["variance_sample_size"])
+        rd.in_max_variance = float(test_details["max_variance"])
+        rd.in_ramp_low = int(test_details.get("ramp_low", 60))
+        rd.in_ramp_med = int(test_details.get("ramp_med", 40))
+        rd.in_ramp_high = int(test_details.get("ramp_high", 20))
+        rd.in_capacity_adjust = test_details.get("capacity_adj", 1)
+
+        rd.in_ramp_seek = self.if_in_set_true(test_details, "ramp_seek",
                                                 {"true", "y", "yes"})
-        self.in_ramp_seek_kpi = test_details.get("ramp_kpi", "tps")
-        self.in_ramp_seek_value = int(test_details.get("ramp_value", 1))
-        self.in_ramp_step = int(test_details.get("ramp_step", 1))
-        if not self.in_ramp_seek:
-            self.ramp_seek_complete = True
+        rd.in_ramp_seek_kpi = test_details.get("ramp_kpi", "tps")
+        rd.in_ramp_seek_value = int(test_details.get("ramp_value", 1))
+        rd.in_ramp_step = int(test_details.get("ramp_step", 1))
+
+        if not rd.in_ramp_seek:
+            rd.ramp_seek_complete = True
         else:
-            self.ramp_seek_complete = False
+            rd.ramp_seek_complete = False
 
-        self.living_simusers_max_bool = self.check_if_number(
-            test_details.get("living_simusers_max", False))
-        self.living_simusers_max = self.return_int_if_present(
-            self.living_simusers_max_bool,
+        rd.living_simusers_max_bool = int(self.check_if_number(
+            test_details.get("living_simusers_max", False)))
+        rd.living_simusers_max = self.return_int_if_present(
+            rd.living_simusers_max_bool,
             test_details.get("living_simusers_max", False))
 
-        self.in_goal_seek = False
-        self.first_steady_interval = True
-        self.in_goal_seek = test_details["goal_seek"]
-        if self.in_goal_seek.lower() in {"true", "y", "yes"}:
-            self.in_goal_seek = True
-            self.first_steady_interval = False
+        rd.in_goal_seek = test_details["goal_seek"]
+        if rd.in_goal_seek.lower() in {"true", "y", "yes"}:
+            rd.in_goal_seek = True
+            rd.first_steady_interval = False
         else:
-            self.in_goal_seek = False
+            rd.in_goal_seek = False
+        
+        rd.start_time = time.time()
+        rd.timer = time.time() - rd.start_time
 
-        self.test_config = self.get_test_config()
-        self.queue_id = self.test_config["config"]["queue"]["id"]
-        self.queue_info = self.get_queue(self.queue_id)
-        self.queue_capacity = int(self.queue_info["capacity"])
-        log.info(f"queue_capacity: {self.queue_capacity}")
-        self.core_count = self.core_count_lookup(self.queue_info)
-        log.info(f"core_count: {self.core_count}")
-        self.client_port_count = len(self.test_config["config"]["interfaces"]["client"])
-        log.info(f"client_port_count: {self.client_port_count}")
-        self.server_port_count = len(self.test_config["config"]["interfaces"]["server"])
-        log.info(f"server_port_count: {self.server_port_count}")
-        self.client_core_count = int(
-            self.core_count
-            / (self.client_port_count + self.server_port_count)
-            * self.client_port_count
+    def init_capacity_adj(self, rd):
+        rd.queue_capacity = int(rd.queue_info["capacity"])
+        log.info(f"queue_capacity: {rd.queue_capacity}")
+        rd.core_count = self.core_count_lookup(rd.queue_info)
+        log.info(f"core_count: {rd.core_count}")
+        rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
+        log.info(f"client_port_count: {rd.client_port_count}")
+        rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
+        log.info(f"server_port_count: {rd.server_port_count}")
+        rd.client_core_count = int(
+            rd.core_count
+            / (rd.client_port_count + rd.server_port_count)
+            * rd.client_port_count
         )
-        log.info(f"client_core_count: {self.client_core_count}")
-        self.in_capacity_adjust = self.check_capacity_adjust(
-            test_details["capacity_adj"],
-            self.in_load_type,
-            self.client_port_count,
-            self.client_core_count,
+        log.info(f"client_core_count: {rd.client_core_count}")
+        rd.in_capacity_adjust = self.check_capacity_adjust(
+            rd.in_capacity_adjust,
+            rd.in_load_type,
+            rd.client_port_count,
+            rd.client_core_count,
         )
-        log.info(f"in_capacity_adjust: {self.in_capacity_adjust}")
-        self.load_constraints = {"enabled": False}
-        if not self.update_config_load():
+        log.info(f"in_capacity_adjust: {rd.in_capacity_adjust}")
+        rd.load_constraints = {"enabled": False}
+        
+    def init_update_config_load(self, rd):    
+        if not self.update_config_load(rd):
             report_error = f"unknown load_type with test type"
             log.debug(report_error)
             print(report_error)
-        self.test_config = self.get_test_config()
 
-        self.test_run = self.start_test_run()
-        if not self.test_started:
-            report_error = f"test did not start\n{json.dumps(self.test_run, indent=4)}"
+    def init_test_run(self, rd, controller_ip):
+        if not rd.test_started:
+            report_error = f"test did not start\n{json.dumps(rd.test_run, indent=4)}"
             log.debug(report_error)
             print(report_error)
-        self.test_run_update = None
+        rd.test_run_update = None
 
-        self.id = self.test_run.get("id")
-        self.queue_id = self.test_run.get("queueId")
-        self.score = self.test_run.get("score")
-        self.grade = self.test_run.get("grade")
-        self.run_id = self.test_run.get("runId")
-        self.status = self.test_run.get("status")  # main run status 'running'
-        self.name = self.test_run.get("test", {}).get("name")
-        self.type_v1 = self.test_run.get("test", {}).get("type")
-        self.sub_status = self.test_run.get("subStatus")
-        self.created_at = self.test_run.get("createdAt")
-        self.updated_at = self.test_run.get("updatedAt")
-        self.started_at = self.test_run.get("startedAt")
-        self.finished_at = self.test_run.get("finishedAt")
-        self.progress = self.test_run.get("progress")
-        self.time_elapsed = self.test_run.get("timeElapsed")
-        self.time_remaining = self.test_run.get("timeRemaining")
+        rd.id = rd.test_run.get("id")
+        rd.queue_id = rd.test_run.get("queueId")
+        rd.score = rd.test_run.get("score")
+        rd.grade = rd.test_run.get("grade")
+        rd.run_id = rd.test_run.get("runId")
+        rd.status = rd.test_run.get("status")  # main run status 'running'
+        rd.name = rd.test_run.get("test", {}).get("name")
+        rd.type_v1 = rd.test_run.get("test", {}).get("type")
+        rd.sub_status = rd.test_run.get("subStatus")
+        rd.created_at = rd.test_run.get("createdAt")
+        rd.updated_at = rd.test_run.get("updatedAt")
+        rd.started_at = rd.test_run.get("startedAt")
+        rd.finished_at = rd.test_run.get("finishedAt")
+        rd.progress = rd.test_run.get("progress")
+        rd.time_elapsed = rd.test_run.get("timeElapsed")
+        rd.time_remaining = rd.test_run.get("timeRemaining")
 
-        self.run_link = (
+        rd.run_link = (
             "https://"
-            + self.cf.controller_ip
+            + controller_ip
             + "/#livecharts/"
-            + self.type_v1
+            + rd.type_v1
             + "/"
-            + self.id
+            + rd.id
         )
-        print(f"Live charts: {self.run_link}")
+        print(f"Live charts: {rd.run_link}")
 
-        self.report_link = None
-        self.sub_status = None  # subStatus -  none while running or not started
-        self.progress = 0  # progress  -  0-100
-        self.time_elapsed = 0  # timeElapsed  - seconds
-        self.time_remaining = 0  # timeRemaining  - seconds
-        self.started_at = None  # startedAt
-        self.finished_at = None  # finishedAt
-
-        self.c_rx_bandwidth = 0
-        self.c_rx_packet_count = 0
-        self.c_rx_packet_rate = 0
-        self.c_tx_bandwidth = 0
-        self.c_tx_packet_count = 0
-        self.c_tx_packet_rate = 0
-        self.c_http_aborted_txns = 0
-        self.c_http_aborted_txns_sec = 0
-        self.c_http_attempted_txns = 0
-        self.c_http_attempted_txns_sec = 0
-        self.c_http_successful_txns = 0
-        self.c_http_successful_txns_sec = 0
-        self.c_http_unsuccessful_txns = 0
-        self.c_http_unsuccessful_txns_sec = 0
-        self.c_loadspec_avg_idle = 0
-        self.c_loadspec_avg_cpu = 0
-        self.c_memory_main_size = 0
-        self.c_memory_main_used = 0
-        self.c_memory_packetmem_used = 0
-        self.c_memory_rcv_queue_length = 0
-        self.c_simusers_alive = 0
-        self.c_simusers_animating = 0
-        self.c_simusers_blocking = 0
-        self.c_simusers_sleeping = 0
-        self.c_tcp_avg_ttfb = 0
-        self.c_tcp_avg_tt_synack = 0
-        self.c_tcp_cumulative_attempted_conns = 0
-        self.c_tcp_cumulative_established_conns = 0
-        self.c_url_avg_response_time = 0
-        self.c_tcp_attempted_conn_rate = 0
-        self.c_tcp_established_conn_rate = 0
-        self.c_tcp_attempted_conns = 0
-        self.c_tcp_established_conns = 0
-        self.c_current_load = 0
-        self.c_desired_load = 0
-        self.c_total_bandwidth = 0
-        self.c_memory_percent_used = 0
-        self.c_current_desired_load_variance = 0.0
-        self.c_current_max_load_variance = 0.0
-        self.c_transaction_error_percentage = 0.0
-
-        self.s_rx_bandwidth = 0
-        self.s_rx_packet_count = 0
-        self.s_rx_packet_rate = 0
-        self.s_tx_bandwidth = 0
-        self.s_tx_packet_count = 0
-        self.s_tx_packet_rate = 0
-        self.s_memory_main_size = 0
-        self.s_memory_main_used = 0
-        self.s_memory_packetmem_used = 0
-        self.s_memory_rcv_queue_length = 0
-        self.s_memory_avg_cpu = 0
-        self.s_tcp_closed_error = 0
-        self.s_tcp_closed = 0
-        self.s_tcp_closed_reset = 0
-        self.s_memory_percent_used = 0
-
-        self.first_ramp_load_increase = True
-        self.first_goal_load_increase = True
-        self.max_load_reached = False
-        self.max_load = 0
-        self.stop = False  # test loop control
-        self.phase = None  # time phase of test: ramp up, steady ramp down
-
+    def init_rolling_stats(self, rd):
         # rolling statistics
-        self.rolling_sample_size = self.variance_sample_size
-        self.max_var_reference = self.in_max_variance
-        self.rolling_tps = RollingStats(self.rolling_sample_size, 0)
-        self.rolling_ttfb = RollingStats(self.rolling_sample_size, 1)
-        self.rolling_current_load = RollingStats(self.rolling_sample_size, 0)
-        self.rolling_count_since_goal_seek = RollingStats(
-            self.rolling_sample_size, 1
+        rd.rolling_sample_size = rd.variance_sample_size
+        rd.max_var_reference = rd.in_max_variance
+        rd.rolling_tps = RollingStats(rd.rolling_sample_size, 0)
+        rd.rolling_ttfb = RollingStats(rd.rolling_sample_size, 1)
+        rd.rolling_current_load = RollingStats(rd.rolling_sample_size, 0)
+        rd.rolling_count_since_goal_seek = RollingStats(
+            rd.rolling_sample_size, 1
         )  # round to 1 for > 0 avg
-        self.rolling_cps = RollingStats(self.rolling_sample_size, 0)
-        self.rolling_conns = RollingStats(self.rolling_sample_size, 0)
-        self.rolling_bw = RollingStats(self.rolling_sample_size, 0)
+        rd.rolling_cps = RollingStats(rd.rolling_sample_size, 0)
+        rd.rolling_conns = RollingStats(rd.rolling_sample_size, 0)
+        rd.rolling_bw = RollingStats(rd.rolling_sample_size, 0)
 
-        self.kpi_1 = self.rolling_tps
-        self.kpi_2 = self.rolling_cps
-        self.kpi_1_stable = True
-        self.kpi_2_stable = True
-        self.kpi_1_list = []
-        self.kpi_2_list = []
-        self.ramp_seek_kpi = self.rolling_tps
-
-        self.start_time = time.time()
-        self.timer = time.time() - self.start_time
-        self.time_to_run = 0
-        self.time_to_start = 0
-        self.time_to_activity = 0
-        self.time_to_stop_start = 0
-        self.time_to_stop = 0
-        self.test_started = False
-
-        # create entry in result file at the start of test
-        self.save_results()
+        rd.kpi_1 = rd.rolling_tps
+        rd.kpi_2 = rd.rolling_cps
+        rd.kpi_1_stable = True
+        rd.kpi_2_stable = True
+        rd.kpi_1_list = []
+        rd.kpi_2_list = []
+        rd.ramp_seek_kpi = rd.rolling_tps
 
     @staticmethod
     def if_in_set_true(dict_var, dict_key, in_set):
@@ -394,10 +501,11 @@ class CfRunTest:
         if present:
             return int(value)
 
-    def get_test_config(self):
+    def get_test_config(self, cf, rd):
+        response = None
         try:
-            response = self.cf.get_test(
-                self.type_v2, self.test_id, self.temp_dir / "running_test_config.json"
+            response = cf.get_test(
+                rd.type_v2, rd.test_id, self.temp_dir / "running_test_config.json"
             )
             log.debug(f"{json.dumps(response, indent=4)}")
         except Exception as detailed_exception:
@@ -408,12 +516,13 @@ class CfRunTest:
         return response
 
     def get_queue(self, queue_id):
+        response = None
         try:
             response = self.cf.get_queue(queue_id)
             log.debug(f"{json.dumps(response, indent=4)}")
         except Exception as detailed_exception:
             log.error(
-                f"Exception occurred when retrieving test queue informationn: "
+                f"Exception occurred when retrieving test queue information: "
                 f"\n<{detailed_exception}>"
             )
         return response
@@ -437,79 +546,80 @@ class CfRunTest:
         else:
             return int(cap_adjust)
 
-    def update_config_load(self):
-        load_type = self.in_load_type.lower()
-        test_type = self.test_type()
+    def update_config_load(self, rd):
+        load_type = rd.in_load_type.lower()
+        test_type = self.test_type(rd)
 
         if test_type in {"tput", "emix"} and load_type == "simusers":
             load_key = "bandwidth"
-            self.in_load_type = "SimUsers"
+            rd.in_load_type = "SimUsers"
         elif test_type in {"tput", "emix"} and load_type == "bandwidth":
             load_key = "bandwidth"
-            self.in_load_type = "Bandwidth"
+            rd.in_load_type = "Bandwidth"
         elif test_type == "tput" and load_type == "simusers/second":
             load_key = "bandwidth"
-            self.in_load_type = "SimUsers/Second"
+            rd.in_load_type = "SimUsers/Second"
         elif test_type == "cps" and load_type == "connections/second":
             load_key = "connectionsPerSecond"
-            self.in_load_type = "Connections/Second"
+            rd.in_load_type = "Connections/Second"
         elif test_type == "cps" and load_type == "simusers":
             load_key = "connectionsPerSecond"
-            self.in_load_type = "SimUsers"
+            rd.in_load_type = "SimUsers"
         elif test_type == "cps" and load_type == "simusers/second":
             load_key = "connectionsPerSecond"
-            self.in_load_type = "SimUsers/Second"
+            rd.in_load_type = "SimUsers/Second"
         elif test_type == "conns" and load_type == "simusers":
             load_key = "connections"
-            self.in_load_type = "SimUsers"
+            rd.in_load_type = "SimUsers"
         elif test_type == "conns" and load_type == "connections":
             load_key = "connections"
-            self.in_load_type = "Connections"
+            rd.in_load_type = "Connections"
         else:
             return False
 
-        self.in_start_load = int(self.in_start_load) * self.in_capacity_adjust
-        self.update_load_constraints()
+        rd.in_start_load = int(rd.in_start_load) * rd.in_capacity_adjust
+        self.update_load_constraints(rd)
         load_update = {
             "config": {
                 "loadSpecification": {
-                    "duration": int(self.in_duration),
-                    "startup": int(self.in_startup),
-                    "rampup": int(self.in_rampup),
-                    "rampdown": int(self.in_rampdown),
-                    "shutdown": int(self.in_shutdown),
-                    load_key: int(self.in_start_load),
-                    "type": self.in_load_type,
-                    "constraints": self.load_constraints,
+                    "duration": int(rd.in_duration),
+                    "startup": int(rd.in_startup),
+                    "rampup": int(rd.in_rampup),
+                    "rampdown": int(rd.in_rampdown),
+                    "shutdown": int(rd.in_shutdown),
+                    load_key: int(rd.in_start_load),
+                    "type": rd.in_load_type,
+                    "constraints": rd.load_constraints,
                     # "constraints": {"enabled": False},
                 }
             }
         }
-        with open(self.temp_dir / "test_load_update.json", "w") as f:
+        with open((self.temp_dir / "test_load_update.json"), "w") as f:
             json.dump(load_update, f, indent=4)
-
-        response = self.cf.update_test(
-            self.type_v2, self.test_id, self.temp_dir / "test_load_update.json"
-        )
-
-        log.info(f"{json.dumps(response, indent=4)}")
         return True
 
-    def update_load_constraints(self):
+    def update_config_load_controller(self, cf, rd):
+        response = cf.update_test(
+            rd.type_v2, rd.test_id, self.temp_dir / "test_load_update.json"
+        )
+        log.info(f"{json.dumps(response, indent=4)}")
+        rd.test_config = self.get_test_config(cf, rd)
+
+    def update_load_constraints(self, rd):
         living = {"enabled": False}
         open_connections = {"enabled": False}
         birth_rate = {"enabled": False}
         connections_rate = {"enabled": False}
         constraints = False
 
-        if self.living_simusers_max_bool:
+        if rd.living_simusers_max_bool:
             constraints = True
             living = {
                 "enabled": True,
-                "max": self.living_simusers_max
+                "max": rd.living_simusers_max
             }
         if constraints:
-            self.load_constraints = {
+            rd.load_constraints = {
                 "enabled": True,
                 "living": living,
                 "openConnections": open_connections,
@@ -517,52 +627,52 @@ class CfRunTest:
                 "connectionsRate": connections_rate,
             }
 
-    def test_type(self):
-        if self.type_v2 == "http_throughput":
+    def test_type(self, rd):
+        if rd.type_v2 == "http_throughput":
             test_type = "tput"
-        elif self.type_v2 == "http_connections_per_second":
+        elif rd.type_v2 == "http_connections_per_second":
             test_type = "cps"
-        elif self.type_v2 == "open_connections":
+        elif rd.type_v2 == "open_connections":
             test_type = "conns"
-        elif self.type_v2 == "emix":
+        elif rd.type_v2 == "emix":
             test_type = "emix"
         else:
             test_type = "tput"
         return test_type
 
-    def start_test_run(self):
+    def start_test_run(self, cf, rd):
         try:
-            response = self.cf.start_test(self.test_id)
+            response = cf.start_test(rd.test_id)
             log.info(f"{json.dumps(response, indent=4)}")
-            self.test_started = True
+            rd.test_started = True
         except Exception as detailed_exception:
             log.error(
                 f"Exception occurred when starting the test: "
                 f"\n<{detailed_exception}>"
             )
-            self.test_started = False
+            rd.test_started = False
         return response
 
-    def update_test_run(self):
-        self.test_run_update = self.cf.get_test_run(self.id)
-        self.status = self.test_run_update.get("status")  # main run status 'running'
-        self.sub_status = self.test_run_update.get("subStatus")
-        self.score = self.test_run_update.get("score")
-        self.grade = self.test_run_update.get("grade")
-        self.started_at = self.test_run_update.get("startedAt")
-        self.finished_at = self.test_run_update.get("finishedAt")
-        self.progress = self.test_run_update.get("progress")
-        self.time_elapsed = self.test_run_update.get("timeElapsed")
-        self.time_remaining = self.test_run_update.get("timeRemaining")
+    def update_test_run(self, cf, rd):
+        rd.test_run_update = cf.get_test_run(rd.id)
+        rd.status = rd.test_run_update.get("status")  # main run status 'running'
+        rd.sub_status = rd.test_run_update.get("subStatus")
+        rd.score = rd.test_run_update.get("score")
+        rd.grade = rd.test_run_update.get("grade")
+        rd.started_at = rd.test_run_update.get("startedAt")
+        rd.finished_at = rd.test_run_update.get("finishedAt")
+        rd.progress = rd.test_run_update.get("progress")
+        rd.time_elapsed = rd.test_run_update.get("timeElapsed")
+        rd.time_remaining = rd.test_run_update.get("timeRemaining")
 
         update_test_run_log = (
-            f"Status: {self.status} sub status: {self.sub_status} "
-            f" elapsed: {self.time_elapsed}  remaining: {self.time_remaining}"
+            f"Status: {rd.status} sub status: {rd.sub_status} "
+            f" elapsed: {rd.time_elapsed}  remaining: {rd.time_remaining}"
         )
         log.debug(update_test_run_log)
         return True
 
-    def update_phase(self):
+    def update_phase(self, rd):
         """updates test phase based on elapsed time vs. loadspec configuration
 
         If goal seeking is enabled and the test is in steady phase, the phase will be set to goalseek
@@ -570,56 +680,56 @@ class CfRunTest:
         :return: None
         """
         phase = None
-        steady_duration = self.in_duration - (
-            self.in_startup + self.in_rampup + self.in_rampdown + self.in_shutdown
+        steady_duration = rd.in_duration - (
+            rd.in_startup + rd.in_rampup + rd.in_rampdown + rd.in_shutdown
         )
-        if 0 <= self.time_elapsed <= self.in_startup:
+        if 0 <= rd.time_elapsed <= rd.in_startup:
             phase = "startup"
-        elif self.in_startup <= self.time_elapsed <= (self.in_startup + self.in_rampup):
+        elif rd.in_startup <= rd.time_elapsed <= (rd.in_startup + rd.in_rampup):
             phase = "rampup"
         elif (
-            (self.in_startup + self.in_rampup)
-            <= self.time_elapsed
-            <= (self.in_duration - (self.in_rampdown + self.in_shutdown))
+            (rd.in_startup + rd.in_rampup)
+            <= rd.time_elapsed
+            <= (rd.in_duration - (rd.in_rampdown + rd.in_shutdown))
         ):
             phase = "steady"
-            if self.first_steady_interval:
+            if rd.first_steady_interval:
                 phase = "rampup"
-                self.first_steady_interval = False
+                rd.first_steady_interval = False
         elif (
-            (self.in_startup + self.in_rampup + steady_duration)
-            <= self.time_elapsed
-            <= (self.in_duration - self.in_shutdown)
+            (rd.in_startup + rd.in_rampup + steady_duration)
+            <= rd.time_elapsed
+            <= (rd.in_duration - rd.in_shutdown)
         ):
             phase = "rampdown"
         elif (
-            (self.in_duration - self.in_shutdown)
-            <= self.time_elapsed
-            <= self.in_duration
+            (rd.in_duration - rd.in_shutdown)
+            <= rd.time_elapsed
+            <= rd.in_duration
         ):
             phase = "shutdown"
-        elif self.in_duration <= self.time_elapsed:
+        elif rd.in_duration <= rd.time_elapsed:
             phase = "finished"
 
         log.info(f"test phase: {phase}")
-        self.phase = phase
+        rd.phase = phase
 
         # Override phase if ramp seek is enabled
-        if self.in_ramp_seek and self.phase == "steady" and not self.ramp_seek_complete:
-            self.phase = "rampseek"
-            log.info(f"ramp seek phase: {self.phase}")
+        if rd.in_ramp_seek and rd.phase == "steady" and not rd.ramp_seek_complete:
+            rd.phase = "rampseek"
+            log.info(f"ramp seek phase: {rd.phase}")
         # Override phase if goal seeking is enabled
-        elif self.in_goal_seek and self.phase == "steady":
-            self.phase = "goalseek"
-            log.info(f"goal seek phase: {self.phase}")
+        elif rd.in_goal_seek and rd.phase == "steady":
+            rd.phase = "goalseek"
+            log.info(f"goal seek phase: {rd.phase}")
 
-    def update_run_stats(self):
-        get_run_stats = self.cf.fetch_test_run_statistics(self.id)
+    def update_run_stats(self, cf, rd):
+        get_run_stats = cf.fetch_test_run_statistics(rd.id)
         # log.debug(f'{get_run_stats}')
-        self.update_client_stats(get_run_stats)
-        self.update_server_stats(get_run_stats)
+        self.update_client_stats(rd, get_run_stats)
+        self.update_server_stats(rd, get_run_stats)
 
-    def update_client_stats(self, get_run_stats):
+    def update_client_stats(self, rd, get_run_stats):
         client_stats = {}
         for i in get_run_stats["client"]:
             if "type" in i and "subType" in i and "value" in i:
@@ -633,9 +743,9 @@ class CfRunTest:
                 type = i["type"]
                 value = i["value"]
                 client_stats[type] = value
-        self.assign_client_run_stats(client_stats)
+        self.assign_client_run_stats(rd, client_stats)
 
-    def update_server_stats(self, get_run_stats):
+    def update_server_stats(self, rd, get_run_stats):
         server_stats = {}
         for i in get_run_stats["server"]:
             if "type" in i and "subType" in i and "value" in i:
@@ -649,174 +759,174 @@ class CfRunTest:
                 type = i["type"]
                 value = i["value"]
                 server_stats[type] = value
-        self.assign_server_run_stats(server_stats)
+        self.assign_server_run_stats(rd, server_stats)
 
-    def assign_client_run_stats(self, client_stats):
-        self.c_rx_bandwidth = client_stats.get("driver", {}).get("rxBandwidth", 0)
-        self.c_rx_packet_count = client_stats.get("driver", {}).get("rxPacketCount", 0)
-        self.c_rx_packet_rate = client_stats.get("driver", {}).get("rxPacketRate", 0)
-        self.c_tx_bandwidth = client_stats.get("driver", {}).get("txBandwidth", 0)
-        self.c_tx_packet_count = client_stats.get("driver", {}).get("txPacketCount", 0)
-        self.c_tx_packet_rate = client_stats.get("driver", {}).get("txPacketRate", 0)
-        self.c_http_aborted_txns = client_stats.get("http", {}).get("abortedTxns", 0)
-        self.c_http_aborted_txns_sec = client_stats.get("http", {}).get(
+    def assign_client_run_stats(self, rd, client_stats):
+        rd.c_rx_bandwidth = client_stats.get("driver", {}).get("rxBandwidth", 0)
+        rd.c_rx_packet_count = client_stats.get("driver", {}).get("rxPacketCount", 0)
+        rd.c_rx_packet_rate = client_stats.get("driver", {}).get("rxPacketRate", 0)
+        rd.c_tx_bandwidth = client_stats.get("driver", {}).get("txBandwidth", 0)
+        rd.c_tx_packet_count = client_stats.get("driver", {}).get("txPacketCount", 0)
+        rd.c_tx_packet_rate = client_stats.get("driver", {}).get("txPacketRate", 0)
+        rd.c_http_aborted_txns = client_stats.get("http", {}).get("abortedTxns", 0)
+        rd.c_http_aborted_txns_sec = client_stats.get("http", {}).get(
             "abortedTxnsPerSec", 0
         )
-        self.c_http_attempted_txns = client_stats.get("sum", {}).get("attemptedTxns", 0)
-        self.c_http_attempted_txns_sec = client_stats.get("sum", {}).get(
+        rd.c_http_attempted_txns = client_stats.get("sum", {}).get("attemptedTxns", 0)
+        rd.c_http_attempted_txns_sec = client_stats.get("sum", {}).get(
             "attemptedTxnsPerSec", 0
         )
-        self.c_http_successful_txns = client_stats.get("sum", {}).get(
+        rd.c_http_successful_txns = client_stats.get("sum", {}).get(
             "successfulTxns", 0
         )
-        self.c_http_successful_txns_sec = client_stats.get("sum", {}).get(
+        rd.c_http_successful_txns_sec = client_stats.get("sum", {}).get(
             "successfulTxnsPerSec", 0
         )
-        self.c_http_unsuccessful_txns = client_stats.get("sum", {}).get(
+        rd.c_http_unsuccessful_txns = client_stats.get("sum", {}).get(
             "unsuccessfulTxns", 0
         )
-        self.c_http_unsuccessful_txns_sec = client_stats.get("sum", {}).get(
+        rd.c_http_unsuccessful_txns_sec = client_stats.get("sum", {}).get(
             "unsuccessfulTxnsPerSec", 0
         )
-        self.c_loadspec_avg_idle = client_stats.get("loadspec", {}).get(
+        rd.c_loadspec_avg_idle = client_stats.get("loadspec", {}).get(
             "averageIdleTime", 0
         )
-        self.c_loadspec_avg_cpu = round(
+        rd.c_loadspec_avg_cpu = round(
             client_stats.get("loadspec", {}).get("cpuUtilized", 0), 1
         )
-        self.c_memory_main_size = client_stats.get("memory", {}).get("mainPoolSize", 0)
-        self.c_memory_main_used = client_stats.get("memory", {}).get("mainPoolUsed", 0)
-        self.c_memory_packetmem_used = client_stats.get("memory", {}).get(
+        rd.c_memory_main_size = client_stats.get("memory", {}).get("mainPoolSize", 0)
+        rd.c_memory_main_used = client_stats.get("memory", {}).get("mainPoolUsed", 0)
+        rd.c_memory_packetmem_used = client_stats.get("memory", {}).get(
             "packetMemoryUsed", 0
         )
-        self.c_memory_rcv_queue_length = client_stats.get("memory", {}).get(
+        rd.c_memory_rcv_queue_length = client_stats.get("memory", {}).get(
             "rcvQueueLength", 0
         )
-        self.c_simusers_alive = client_stats.get("simusers", {}).get("simUsersAlive", 0)
-        self.c_simusers_animating = client_stats.get("simusers", {}).get(
+        rd.c_simusers_alive = client_stats.get("simusers", {}).get("simUsersAlive", 0)
+        rd.c_simusers_animating = client_stats.get("simusers", {}).get(
             "simUsersAnimating", 0
         )
-        self.c_simusers_blocking = client_stats.get("simusers", {}).get(
+        rd.c_simusers_blocking = client_stats.get("simusers", {}).get(
             "simUsersBlocking", 0
         )
-        self.c_simusers_sleeping = client_stats.get("simusers", {}).get(
+        rd.c_simusers_sleeping = client_stats.get("simusers", {}).get(
             "simUsersSleeping", 0
         )
-        self.c_current_load = client_stats.get("sum", {}).get("currentLoadSpecCount", 0)
-        self.c_desired_load = client_stats.get("sum", {}).get("desiredLoadSpecCount", 0)
-        self.c_tcp_avg_ttfb = round(
+        rd.c_current_load = client_stats.get("sum", {}).get("currentLoadSpecCount", 0)
+        rd.c_desired_load = client_stats.get("sum", {}).get("desiredLoadSpecCount", 0)
+        rd.c_tcp_avg_ttfb = round(
             client_stats.get("tcp", {}).get("averageTimeToFirstByte", 0), 1
         )
-        self.c_tcp_avg_tt_synack = round(
+        rd.c_tcp_avg_tt_synack = round(
             client_stats.get("tcp", {}).get("averageTimeToSynAck", 0), 1
         )
-        self.c_tcp_cumulative_attempted_conns = client_stats.get("tcp", {}).get(
+        rd.c_tcp_cumulative_attempted_conns = client_stats.get("tcp", {}).get(
             "cummulativeAttemptedConns", 0
         )
-        self.c_tcp_cumulative_established_conns = client_stats.get("tcp", {}).get(
+        rd.c_tcp_cumulative_established_conns = client_stats.get("tcp", {}).get(
             "cummulativeEstablishedConns", 0
         )
-        self.c_url_avg_response_time = round(
+        rd.c_url_avg_response_time = round(
             client_stats.get("url", {}).get("averageRespTimePerUrl", 0), 1
         )
-        self.c_tcp_attempted_conn_rate = client_stats.get("sum", {}).get(
+        rd.c_tcp_attempted_conn_rate = client_stats.get("sum", {}).get(
             "attemptedConnRate", 0
         )
-        self.c_tcp_established_conn_rate = client_stats.get("sum", {}).get(
+        rd.c_tcp_established_conn_rate = client_stats.get("sum", {}).get(
             "establishedConnRate", 0
         )
-        self.c_tcp_attempted_conns = client_stats.get("sum", {}).get(
+        rd.c_tcp_attempted_conns = client_stats.get("sum", {}).get(
             "attemptedConns", 0
         )
-        self.c_tcp_established_conns = client_stats.get("sum", {}).get(
+        rd.c_tcp_established_conns = client_stats.get("sum", {}).get(
             "currentEstablishedConns", 0
         )
 
-        self.time_elapsed = client_stats.get("timeElapsed", 0)
-        self.time_remaining = client_stats.get("timeRemaining", 0)
+        rd.time_elapsed = client_stats.get("timeElapsed", 0)
+        rd.time_remaining = client_stats.get("timeRemaining", 0)
 
-        self.c_total_bandwidth = self.c_rx_bandwidth + self.c_tx_bandwidth
-        if self.c_memory_main_size > 0 and self.c_memory_main_used > 0:
-            self.c_memory_percent_used = round(
-                self.c_memory_main_used / self.c_memory_main_size, 1
+        rd.c_total_bandwidth = rd.c_rx_bandwidth + rd.c_tx_bandwidth
+        if rd.c_memory_main_size > 0 and rd.c_memory_main_used > 0:
+            rd.c_memory_percent_used = round(
+                rd.c_memory_main_used / rd.c_memory_main_size, 1
             )
-        if self.c_current_load > 0 and self.c_desired_load > 0:
-            self.c_current_desired_load_variance = round(
-                self.c_current_load / self.c_desired_load, 2
+        if rd.c_current_load > 0 and rd.c_desired_load > 0:
+            rd.c_current_desired_load_variance = round(
+                rd.c_current_load / rd.c_desired_load, 2
             )
 
-        if self.c_http_successful_txns > 0:
-            self.c_transaction_error_percentage = (
-                self.c_http_unsuccessful_txns + self.c_http_aborted_txns
-            ) / self.c_http_successful_txns
+        if rd.c_http_successful_txns > 0:
+            rd.c_transaction_error_percentage = (
+                rd.c_http_unsuccessful_txns + rd.c_http_aborted_txns
+            ) / rd.c_http_successful_txns
         return True
 
-    def assign_server_run_stats(self, server_stats):
-        self.s_rx_bandwidth = server_stats.get("driver", {}).get("rxBandwidth", 0)
-        self.s_rx_packet_count = server_stats.get("driver", {}).get("rxPacketCount", 0)
-        self.s_rx_packet_rate = server_stats.get("driver", {}).get("rxPacketRate", 0)
-        self.s_tx_bandwidth = server_stats.get("driver", {}).get("txBandwidth", 0)
-        self.s_tx_packet_count = server_stats.get("driver", {}).get("txPacketCount", 0)
-        self.s_tx_packet_rate = server_stats.get("driver", {}).get("txPacketRate", 0)
-        self.s_memory_main_size = server_stats.get("memory", {}).get("mainPoolSize", 0)
-        self.s_memory_main_used = server_stats.get("memory", {}).get("mainPoolUsed", 0)
-        self.s_memory_packetmem_used = server_stats.get("memory", {}).get(
+    def assign_server_run_stats(self, rd, server_stats):
+        rd.s_rx_bandwidth = server_stats.get("driver", {}).get("rxBandwidth", 0)
+        rd.s_rx_packet_count = server_stats.get("driver", {}).get("rxPacketCount", 0)
+        rd.s_rx_packet_rate = server_stats.get("driver", {}).get("rxPacketRate", 0)
+        rd.s_tx_bandwidth = server_stats.get("driver", {}).get("txBandwidth", 0)
+        rd.s_tx_packet_count = server_stats.get("driver", {}).get("txPacketCount", 0)
+        rd.s_tx_packet_rate = server_stats.get("driver", {}).get("txPacketRate", 0)
+        rd.s_memory_main_size = server_stats.get("memory", {}).get("mainPoolSize", 0)
+        rd.s_memory_main_used = server_stats.get("memory", {}).get("mainPoolUsed", 0)
+        rd.s_memory_packetmem_used = server_stats.get("memory", {}).get(
             "packetMemoryUsed", 0
         )
-        self.s_memory_rcv_queue_length = server_stats.get("memory", {}).get(
+        rd.s_memory_rcv_queue_length = server_stats.get("memory", {}).get(
             "rcvQueueLength", 0
         )
-        self.s_memory_avg_cpu = round(
+        rd.s_memory_avg_cpu = round(
             server_stats.get("memory", {}).get("cpuUtilized", 0), 1
         )
-        self.s_tcp_closed_error = server_stats.get("sum", {}).get("closedWithError", 0)
-        self.s_tcp_closed = server_stats.get("sum", {}).get("closedWithNoError", 0)
-        self.s_tcp_closed_reset = server_stats.get("sum", {}).get("closedWithReset", 0)
+        rd.s_tcp_closed_error = server_stats.get("sum", {}).get("closedWithError", 0)
+        rd.s_tcp_closed = server_stats.get("sum", {}).get("closedWithNoError", 0)
+        rd.s_tcp_closed_reset = server_stats.get("sum", {}).get("closedWithReset", 0)
 
-        if self.s_memory_main_size > 0 and self.s_memory_main_used > 0:
-            self.s_memory_percent_used = round(
-                self.s_memory_main_used / self.s_memory_main_size, 1
+        if rd.s_memory_main_size > 0 and rd.s_memory_main_used > 0:
+            rd.s_memory_percent_used = round(
+                rd.s_memory_main_used / rd.s_memory_main_size, 1
             )
         return True
 
-    def print_test_status(self):
+    def print_test_status(self, rd):
         status = (
-            f"{self.timer}s -status: {self.status} -sub status: {self.sub_status} "
-            f"-progress: {self.progress} -seconds elapsed: {self.time_elapsed} "
-            f"-remaining: {self.time_remaining}"
+            f"{rd.timer}s -status: {rd.status} -sub status: {rd.sub_status} "
+            f"-progress: {rd.progress} -seconds elapsed: {rd.time_elapsed} "
+            f"-remaining: {rd.time_remaining}"
         )
         print(status)
 
-    def print_test_stats(self):
+    def print_test_stats(self, rd):
         stats = (
-            f"{self.time_elapsed}s {self.phase} -load: {self.c_current_load:,}/{self.c_desired_load:,} "
-            f"-current/desired var: {self.c_current_desired_load_variance} "
-            f"-current avg/max var: {self.rolling_tps.avg_max_load_variance} "
-            f"-seek ready: {self.rolling_count_since_goal_seek.stable}"
-            f"\n-tps: {self.c_http_successful_txns_sec:,} -tps stable: {self.rolling_tps.stable} "
-            f"-tps cur avg: {self.rolling_tps.avg_val:,} -tps prev: {self.rolling_tps.avg_val_last:,} "
-            f"-delta tps: {self.rolling_tps.increase_avg} -tps list:{self.rolling_tps.list} "
-            f"\n-cps: {self.c_tcp_established_conn_rate:,} -cps stable: {self.rolling_cps.stable} "
-            f"-cps cur avg: {self.rolling_cps.avg_val:,} -cps prev: {self.rolling_cps.avg_val_last:,} "
-            f"-delta cps: {self.rolling_cps.increase_avg} -cps list:{self.rolling_cps.list} "
-            f"\n-conns: {self.c_tcp_established_conns:,} -conns stable: {self.rolling_conns.stable} "
-            f"-conns cur avg: {self.rolling_conns.avg_val:,} -conns prev: {self.rolling_conns.avg_val_last:,} "
-            f"-delta conns: {self.rolling_cps.increase_avg} -conns list:{self.rolling_conns.list} "
-            f"\n-bw: {self.c_total_bandwidth:,} -bw stable: {self.rolling_bw.stable} "
-            f"-bw cur avg: {self.rolling_bw.avg_val:,} -bw prev: {self.rolling_bw.avg_val_last:,} "
-            f"-delta bw: {self.rolling_bw.increase_avg} -bw list:{self.rolling_bw.list} "
-            f"\n-ttfb: {self.c_tcp_avg_ttfb:,} -ttfb stable: {self.rolling_ttfb.stable} "
-            f"-ttfb cur avg: {self.rolling_ttfb.avg_val:,} -ttfb prev: {self.rolling_ttfb.avg_val_last:,} "
-            f"-delta ttfb: {self.rolling_ttfb.increase_avg} -ttfb list:{self.rolling_ttfb.list} "
-            # f"\n-total bw: {self.c_total_bandwidth:,} -rx bw: {self.c_rx_bandwidth:,}"
-            # f" tx bw: {self.c_tx_bandwidth:,}"
-            # f"\n-ttfb cur avg: {self.rolling_ttfb.avg_val} -ttfb prev: {self.rolling_ttfb.avg_val_last} "
-            # f"-delta ttfb: {self.rolling_ttfb.increase_avg} -ttfb list:{self.rolling_ttfb.list}"
+            f"{rd.time_elapsed}s {rd.phase} -load: {rd.c_current_load:,}/{rd.c_desired_load:,} "
+            f"-current/desired var: {rd.c_current_desired_load_variance} "
+            f"-current avg/max var: {rd.rolling_tps.avg_max_load_variance} "
+            f"-seek ready: {rd.rolling_count_since_goal_seek.stable}"
+            f"\n-tps: {rd.c_http_successful_txns_sec:,} -tps stable: {rd.rolling_tps.stable} "
+            f"-tps cur avg: {rd.rolling_tps.avg_val:,} -tps prev: {rd.rolling_tps.avg_val_last:,} "
+            f"-delta tps: {rd.rolling_tps.increase_avg} -tps list:{rd.rolling_tps.list} "
+            f"\n-cps: {rd.c_tcp_established_conn_rate:,} -cps stable: {rd.rolling_cps.stable} "
+            f"-cps cur avg: {rd.rolling_cps.avg_val:,} -cps prev: {rd.rolling_cps.avg_val_last:,} "
+            f"-delta cps: {rd.rolling_cps.increase_avg} -cps list:{rd.rolling_cps.list} "
+            f"\n-conns: {rd.c_tcp_established_conns:,} -conns stable: {rd.rolling_conns.stable} "
+            f"-conns cur avg: {rd.rolling_conns.avg_val:,} -conns prev: {rd.rolling_conns.avg_val_last:,} "
+            f"-delta conns: {rd.rolling_cps.increase_avg} -conns list:{rd.rolling_conns.list} "
+            f"\n-bw: {rd.c_total_bandwidth:,} -bw stable: {rd.rolling_bw.stable} "
+            f"-bw cur avg: {rd.rolling_bw.avg_val:,} -bw prev: {rd.rolling_bw.avg_val_last:,} "
+            f"-delta bw: {rd.rolling_bw.increase_avg} -bw list:{rd.rolling_bw.list} "
+            f"\n-ttfb: {rd.c_tcp_avg_ttfb:,} -ttfb stable: {rd.rolling_ttfb.stable} "
+            f"-ttfb cur avg: {rd.rolling_ttfb.avg_val:,} -ttfb prev: {rd.rolling_ttfb.avg_val_last:,} "
+            f"-delta ttfb: {rd.rolling_ttfb.increase_avg} -ttfb list:{rd.rolling_ttfb.list} "
+            # f"\n-total bw: {rd.c_total_bandwidth:,} -rx bw: {rd.c_rx_bandwidth:,}"
+            # f" tx bw: {rd.c_tx_bandwidth:,}"
+            # f"\n-ttfb cur avg: {rd.rolling_ttfb.avg_val} -ttfb prev: {rd.rolling_ttfb.avg_val_last} "
+            # f"-delta ttfb: {rd.rolling_ttfb.increase_avg} -ttfb list:{rd.rolling_ttfb.list}"
         )
         print(stats)
         log.debug(stats)
 
-    def wait_for_running_status(self):
+    def wait_for_running_status(self, cf, rd):
         """
         Wait for the current test to return a 'running' status.
         :return: True if no statements failed and there were no exceptions. False otherwise.
@@ -825,45 +935,45 @@ class CfRunTest:
         i = 0
         while True:
             time.sleep(4)
-            self.timer = int(round(time.time() - self.start_time))
+            rd.timer = int(round(time.time() - rd.start_time))
             i += 4
-            if not self.update_test_run():
+            if not self.update_test_run(cf, rd):
                 return False
-            if self.status == "running":
-                print(f"{self.timer}s - status: {self.status}")
+            if rd.status == "running":
+                print(f"{rd.timer}s - status: {rd.status}")
                 break
 
             print(
-                f"{self.timer}s - status: {self.status}  sub status: {self.sub_status}"
+                f"{rd.timer}s - status: {rd.status}  sub status: {rd.sub_status}"
             )
-            if self.status in {"failed", "finished"}:
+            if rd.status in {"failed", "finished"}:
                 log.error("Test failed")
                 return False
             # check to see if another test with the same ID is running
             # (can happen due to requests retry)
-            if i > 120 and self.status == "waiting":
-                self.check_running_tests()
+            if i > 120 and rd.status == "waiting":
+                self.check_running_tests(cf, rd)
             # stop after 1800 seconds of waiting
             if i > 1800:
                 log.error(
                     "Waited for 1800 seconds, test did not transition to a running status."
                 )
                 return False
-        self.time_to_run = self.timer
-        log.debug(f"Test {self.name} successfully went to running status.")
-        log.debug(json.dumps(self.test_run_update, indent=4))
-        self.run_id = self.test_run_update.get("runId")
-        self.report_link = (
+        rd.time_to_run = rd.timer
+        log.debug(f"Test {rd.name} successfully went to running status.")
+        log.debug(json.dumps(rd.test_run_update, indent=4))
+        rd.run_id = rd.test_run_update.get("runId")
+        rd.report_link = (
             "https://"
-            + self.cf.controller_ip
+            + cf.controller_ip
             + "/#results/"
-            + self.type_v1
+            + rd.type_v1
             + "/"
-            + self.run_id
+            + rd.run_id
         )
         return True
 
-    def check_running_tests(self):
+    def check_running_tests(self, cf, rd):
         """Checks if tests with same ID is running and changes control to this test
         This function can be triggered if waiting status is too long because the requests module retry mechanism has
         kicked off two duplicate tests in error. It will look for matching running tests and switch control over to the
@@ -871,7 +981,7 @@ class CfRunTest:
         :return: None
         """
         # get list of run IDs and test IDs with status
-        test_runs = self.cf.list_test_runs()
+        test_runs = cf.list_test_runs()
         # look for running status and compare ID
         for run in test_runs:
             if run["status"] == "running":
@@ -879,24 +989,24 @@ class CfRunTest:
                     f"check_running_tests found running test: {json.dumps(run, indent=4)}"
                 )
                 # if waiting and running test IDs match, change the running test
-                if self.test_id == run["testId"]:
+                if rd.test_id == run["testId"]:
                     log.debug(
-                        f"check_running_tests found matching test_id {self.test_id}"
+                        f"check_running_tests found matching test_id {rd.test_id}"
                     )
                     # stop current waiting test
-                    response = self.cf.stop_test(self.id)
+                    response = cf.stop_test(rd.id)
                     log.debug(
                         f"change_running_test, stopped duplicate waiting test: {response}"
                     )
                     # change over to running test
-                    self.id = run["id"]
+                    rd.id = run["id"]
                 else:
                     log.debug(
-                        f"check_running_tests test_id: {self.test_id} "
+                        f"check_running_tests test_id: {rd.test_id} "
                         f"does not match running test_id: {run['testId']}"
                     )
 
-    def wait_for_running_sub_status(self):
+    def wait_for_running_sub_status(self, cf, rd):
         """
         Wait for the current test to return a 'None' sub status.
         :return: True if no statements failed and there were no exceptions. False otherwise.
@@ -905,17 +1015,17 @@ class CfRunTest:
         i = 0
         while True:
             time.sleep(4)
-            self.timer = int(round(time.time() - self.start_time))
+            rd.timer = int(round(time.time() - rd.start_time))
             i += 4
-            if not self.update_test_run():
+            if not self.update_test_run(cf, rd):
                 return False
             print(
-                f"{self.timer}s - status: {self.status}  sub status: {self.sub_status}"
+                f"{rd.timer}s - status: {rd.status}  sub status: {rd.sub_status}"
             )
-            if self.sub_status is None:
+            if rd.sub_status is None:
                 break
 
-            if self.status in {"failed", "finished"}:
+            if rd.status in {"failed", "finished"}:
                 log.error("Test failed")
                 return False
             # stop after 0 seconds of waiting
@@ -924,38 +1034,38 @@ class CfRunTest:
                     "Waited for 360 seconds, test did not transition to traffic state."
                 )
                 return False
-        self.time_to_start = self.timer - self.time_to_run
-        log.debug(f"Test {self.name} successfully went to traffic state.")
-        log.debug(json.dumps(self.test_run_update, indent=4))
+        rd.time_to_start = rd.timer - rd.time_to_run
+        log.debug(f"Test {rd.name} successfully went to traffic state.")
+        log.debug(json.dumps(rd.test_run_update, indent=4))
         return True
 
-    def stop_wait_for_finished_status(self):
+    def stop_wait_for_finished_status(self, cf, rd):
         """
         Stop and wait for the current test to return a 'finished' status.
         :return: True if no statements failed and there were no exceptions.
          False otherwise.
         """
         log.debug("Inside the stop_test/wait_for_finished_status method.")
-        self.time_to_stop_start = self.timer
-        if self.status == "running":
-            self.cf.stop_test(self.id)
+        rd.time_to_stop_start = rd.timer
+        if rd.status == "running":
+            self.cf.stop_test(rd.id)
 
         i = 0
         while True:
             time.sleep(4)
-            self.timer = int(round(time.time() - self.start_time))
+            rd.timer = int(round(time.time() - rd.start_time))
             i += 4
-            if not self.update_test_run():
+            if not self.update_test_run(cf, rd):
                 return False
-            if self.status in {"stopped", "finished", "failed"}:
-                print(f"{self.timer} status: {self.status}")
+            if rd.status in {"stopped", "finished", "failed"}:
+                print(f"{rd.timer} status: {rd.status}")
                 break
-            if self.status == "failed":
-                print(f"{self.timer} status: {self.status}")
+            if rd.status == "failed":
+                print(f"{rd.timer} status: {rd.status}")
                 return False
 
             print(
-                f"{self.timer}s - status: {self.status}  sub status: {self.sub_status}"
+                f"{rd.timer}s - status: {rd.status}  sub status: {rd.sub_status}"
             )
             if i > 1800:
                 error_msg = (
@@ -965,14 +1075,14 @@ class CfRunTest:
                 log.error(error_msg)
                 print(error_msg)
                 return False
-        self.time_to_stop = self.timer - self.time_to_stop_start
+        rd.time_to_stop = rd.timer - rd.time_to_stop_start
         log.debug(
-            f"Test {self.name} successfully went to finished status in "
-            f"{self.time_to_stop} seconds."
+            f"Test {rd.name} successfully went to finished status in "
+            f"{rd.time_to_stop} seconds."
         )
         return True
 
-    def wait_for_test_activity(self):
+    def wait_for_test_activity(self, cf, rd):
         """
         Wait for the current test to show activity - metric(s) different than 0.
         :return: True if no statements failed and there were no exceptions.
@@ -982,18 +1092,18 @@ class CfRunTest:
         test_generates_activity = False
         i = 0
         while not test_generates_activity:
-            self.timer = int(round(time.time() - self.start_time))
-            self.update_test_run()
-            self.update_run_stats()
-            # self.print_test_status()
+            rd.timer = int(round(time.time() - rd.start_time))
+            self.update_test_run(cf, rd)
+            self.update_run_stats(cf, rd)
+            # self.print_test_status(rd)
 
-            if self.sub_status is None:
-                self.print_test_stats()
-                self.save_results()
+            if rd.sub_status is None:
+                self.print_test_stats(rd)
+                self.save_results(rd)
 
-            if self.c_http_successful_txns_sec > 0:
+            if rd.c_http_successful_txns_sec > 0:
                 test_generates_activity = True
-            if self.status in {"failed", "finished"}:
+            if rd.status in {"failed", "finished"}:
                 log.error("Test failed")
                 return False
             if i > 180:
@@ -1006,7 +1116,7 @@ class CfRunTest:
             time.sleep(4)
             i = i + 4
             print(f"")
-        self.time_to_activity = self.timer - self.time_to_start - self.time_to_run
+        rd.time_to_activity = rd.timer - rd.time_to_start - rd.time_to_run
         return True
 
     @staticmethod
@@ -1025,89 +1135,89 @@ class CfRunTest:
             time.sleep(1)
             t -= 1
 
-    def goal_seek(self):
+    def goal_seek(self, rd):
         log.info(f"In goal_seek function")
-        if self.c_current_load == 0:
-            self.stop = True
+        if rd.c_current_load == 0:
+            rd.stop = True
             log.info(f"goal_seek stop, c_current_load == 0")
             return False
-        if self.first_goal_load_increase:
-            self.first_goal_load_increase = False
-            new_load = self.c_current_load + (self.in_incr_low *
-                                              self.in_capacity_adjust)
+        if rd.first_goal_load_increase:
+            rd.first_goal_load_increase = False
+            new_load = rd.c_current_load + (rd.in_incr_low *
+                                              rd.in_capacity_adjust)
         else:
-            if self.check_if_load_type_simusers():
-                new_load = self.goal_seek_set_simuser_kpi(self.kpi_1)
+            if self.check_if_load_type_simusers(rd):
+                new_load = self.goal_seek_set_simuser_kpi(rd, rd.kpi_1)
                 log.info(f"new_load = {new_load}")
-            elif self.check_if_load_type_default():
-                new_load = self.goal_seek_set_default()
+            elif self.check_if_load_type_default(rd):
+                new_load = self.goal_seek_set_default(rd)
                 log.info(f"new_load = {new_load}")
             else:
                 report_error = f"Unknown load type: " \
-                    f"{self.test_config['config']['loadSpecification']['type']}"
+                    f"{rd.test_config['config']['loadSpecification']['type']}"
                 log.error(report_error)
                 print(report_error)
                 return False
 
         if new_load is False:
             log.info(
-                f"Config load spec type: {self.test_config['config']['loadSpecification']['type']}"
+                f"Config load spec type: {rd.test_config['config']['loadSpecification']['type']}"
             )
             log.info(f"Goal_seek return, new_load is False")
             return False
 
-        self.change_update_load(new_load, 16)
+        self.change_update_load(rd, new_load, 16)
 
         return True
 
-    def ramp_seek(self, ramp_kpi, ramp_to_value):
+    def ramp_seek(self, rd, ramp_kpi, ramp_to_value):
         log.info(f"In ramp_seek function")
-        if self.c_current_load == 0:
-            self.stop = True
+        if rd.c_current_load == 0:
+            rd.stop = True
             log.info(f"ramp_seek stop, c_current_load == 0")
             return False
-        # if self.first_ramp_load_increase:
-        #     self.first_ramp_load_increase = False
-        #     new_load = self.c_current_load * 2
+        # if rd.first_ramp_load_increase:
+        #     rd.first_ramp_load_increase = False
+        #     new_load = rd.c_current_load * 2
 
-        if self.in_ramp_step < 1:
-            self.ramp_seek_complete = True
+        if rd.in_ramp_step < 1:
+            rd.ramp_seek_complete = True
             return
         if ramp_kpi.current_value < ramp_to_value:
             load_increase_multiple = round(ramp_to_value / ramp_kpi.current_value, 3)
-            load_increase = (self.c_current_load * load_increase_multiple) - self.c_current_load
-            load_increase = round(load_increase / self.in_ramp_step, 3)
-            new_load = self.round_up_to_even(self.c_current_load + load_increase)
-            self.in_ramp_step = self.in_ramp_step - 1
+            load_increase = (rd.c_current_load * load_increase_multiple) - rd.c_current_load
+            load_increase = round(load_increase / rd.in_ramp_step, 3)
+            new_load = self.round_up_to_even(rd.c_current_load + load_increase)
+            rd.in_ramp_step = rd.in_ramp_step - 1
 
-            log.info(f"new load: {new_load}, current_load: {self.c_current_load}"
+            log.info(f"new load: {new_load}, current_load: {rd.c_current_load}"
                      f" * {load_increase} load_increase "
-                     f"ramp_step left: {self.in_ramp_step} "
+                     f"ramp_step left: {rd.in_ramp_step} "
                      f"\n ramp_to_value: {ramp_to_value} "
                      f"ramp_kpi.current_value: {ramp_kpi.current_value}"
                      )
-            self.in_incr_low = self.round_up_to_even(new_load * self.in_ramp_low/100)
-            self.in_incr_med = self.round_up_to_even(new_load * self.in_ramp_med/100)
-            self.in_incr_high = self.round_up_to_even(new_load * self.in_ramp_high/100)
+            rd.in_incr_low = self.round_up_to_even(new_load * rd.in_ramp_low/100)
+            rd.in_incr_med = self.round_up_to_even(new_load * rd.in_ramp_med/100)
+            rd.in_incr_high = self.round_up_to_even(new_load * rd.in_ramp_high/100)
         else:
-            self.ramp_seek_complete = True
-        self.change_update_load(new_load, 8)
+            rd.ramp_seek_complete = True
+        self.change_update_load(rd, new_load, 8)
         return True
 
     @staticmethod
     def round_up_to_even(v):
         return math.ceil(v / 2.) * 2
 
-    def check_if_load_type_simusers(self):
-        if self.test_config["config"]["loadSpecification"]["type"].lower() in {
+    def check_if_load_type_simusers(self, rd):
+        if rd.test_config["config"]["loadSpecification"]["type"].lower() in {
             "simusers",
             "simusers/second",
         }:
             return True
         return False
 
-    def check_if_load_type_default(self):
-        if self.test_config["config"]["loadSpecification"]["type"].lower() in {
+    def check_if_load_type_default(self, rd):
+        if rd.test_config["config"]["loadSpecification"]["type"].lower() in {
             "bandwidth",
             "connections",
             "connections/second",
@@ -1115,19 +1225,19 @@ class CfRunTest:
             return True
         return False
 
-    def change_update_load(self, new_load, count_down):
+    def change_update_load(self, rd, new_load, count_down):
         new_load = self.round_up_to_even(new_load)
-        log_msg = f"\nchanging load from: {self.c_current_load} to: {new_load}  status: {self.status}"
+        log_msg = f"\nchanging load from: {rd.c_current_load} to: {new_load}  status: {rd.status}"
         log.info(log_msg)
         print(log_msg)
         try:
-            self.cf.change_load(self.id, new_load)
-            self.rolling_tps.load_increase_complete()
-            self.rolling_ttfb.load_increase_complete()
-            self.rolling_current_load.load_increase_complete()
-            self.rolling_cps.load_increase_complete()
-            self.rolling_conns.load_increase_complete()
-            self.rolling_bw.load_increase_complete()
+            self.cf.change_load(rd.id, new_load)
+            rd.rolling_tps.load_increase_complete()
+            rd.rolling_ttfb.load_increase_complete()
+            rd.rolling_current_load.load_increase_complete()
+            rd.rolling_cps.load_increase_complete()
+            rd.rolling_conns.load_increase_complete()
+            rd.rolling_bw.load_increase_complete()
         except Exception as detailed_exception:
             log.error(
                 f"Exception occurred when changing test: " f"\n<{detailed_exception}>"
@@ -1135,130 +1245,130 @@ class CfRunTest:
         self.countdown(count_down)
         return True
 
-    def goal_seek_set_default(self):
+    def goal_seek_set_default(self, rd):
         set_load = 0
-        if self.c_current_desired_load_variance >= 0.97:
-            if self.c_current_load <= self.in_threshold_low:
-                set_load = self.c_current_load + (
-                    self.in_incr_low * self.in_capacity_adjust
+        if rd.c_current_desired_load_variance >= 0.97:
+            if rd.c_current_load <= rd.in_threshold_low:
+                set_load = rd.c_current_load + (
+                    rd.in_incr_low * rd.in_capacity_adjust
                 )
-            elif self.c_current_load <= self.in_threshold_med:
-                set_load = self.c_current_load + (
-                    self.in_incr_med * self.in_capacity_adjust
+            elif rd.c_current_load <= rd.in_threshold_med:
+                set_load = rd.c_current_load + (
+                    rd.in_incr_med * rd.in_capacity_adjust
                 )
-            elif self.c_current_load <= self.in_threshold_high:
-                set_load = self.c_current_load + (
-                    self.in_incr_high * self.in_capacity_adjust
+            elif rd.c_current_load <= rd.in_threshold_high:
+                set_load = rd.c_current_load + (
+                    rd.in_incr_high * rd.in_capacity_adjust
                 )
-            elif self.c_current_load > self.in_threshold_high:
+            elif rd.c_current_load > rd.in_threshold_high:
                 return False
         else:
             return False
-        if self.in_threshold_high < set_load:
-            if self.c_current_desired_load_variance > 0.99:
+        if rd.in_threshold_high < set_load:
+            if rd.c_current_desired_load_variance > 0.99:
                 return False
             else:
-                set_load = self.in_threshold_high
+                set_load = rd.in_threshold_high
         return set_load
 
-    def goal_seek_set_simuser_kpi(self, kpi):
+    def goal_seek_set_simuser_kpi(self, rd, kpi):
         log.debug(f"in goal_seek_set_simuser_kpi function")
         set_load = 0
-        if kpi.increase_avg >= self.in_threshold_low:
-            set_load = self.c_current_load + (self.in_incr_low *
-                                              self.in_capacity_adjust)
-        elif kpi.increase_avg >= self.in_threshold_med:
-            set_load = self.c_current_load + (self.in_incr_med *
-                                              self.in_capacity_adjust)
-        elif kpi.increase_avg >= self.in_threshold_high:
-            set_load = self.c_current_load + (self.in_incr_high *
-                                              self.in_capacity_adjust)
-        elif kpi.increase_avg < self.in_threshold_high:
+        if kpi.increase_avg >= rd.in_threshold_low:
+            set_load = rd.c_current_load + (rd.in_incr_low *
+                                              rd.in_capacity_adjust)
+        elif kpi.increase_avg >= rd.in_threshold_med:
+            set_load = rd.c_current_load + (rd.in_incr_med *
+                                              rd.in_capacity_adjust)
+        elif kpi.increase_avg >= rd.in_threshold_high:
+            set_load = rd.c_current_load + (rd.in_incr_high *
+                                              rd.in_capacity_adjust)
+        elif kpi.increase_avg < rd.in_threshold_high:
             log.info(
                 f"rolling_tps.increase_avg {kpi.increase_avg} < "
-                f"{self.in_threshold_high} in_threshold_high"
+                f"{rd.in_threshold_high} in_threshold_high"
             )
             return False
         if kpi.avg_max_load_variance < 0.97:
-            set_load = self.c_current_load
-            self.max_load_reached = True
+            set_load = rd.c_current_load
+            rd.max_load_reached = True
         log.info(
             f"set_load = {set_load}  "
             f"kpi_avg_max_load_variance: {kpi.avg_max_load_variance}"
         )
         return set_load
 
-    def update_rolling_averages(self):
+    def update_rolling_averages(self, rd):
         """Updates rolling statistics averages used to make test control decisions
 
         :return: None
         """
-        self.rolling_tps.update(self.c_http_successful_txns_sec)
-        self.rolling_tps.check_if_stable(self.max_var_reference)
+        rd.rolling_tps.update(rd.c_http_successful_txns_sec)
+        rd.rolling_tps.check_if_stable(rd.max_var_reference)
 
-        self.rolling_ttfb.update(self.c_tcp_avg_ttfb)
-        self.rolling_ttfb.check_if_stable(self.max_var_reference)
+        rd.rolling_ttfb.update(rd.c_tcp_avg_ttfb)
+        rd.rolling_ttfb.check_if_stable(rd.max_var_reference)
 
-        self.rolling_current_load.update(self.c_current_load)
-        self.rolling_current_load.check_if_stable(self.max_var_reference)
+        rd.rolling_current_load.update(rd.c_current_load)
+        rd.rolling_current_load.check_if_stable(rd.max_var_reference)
 
-        self.rolling_cps.update(self.c_tcp_established_conn_rate)
-        self.rolling_cps.check_if_stable(self.max_var_reference)
+        rd.rolling_cps.update(rd.c_tcp_established_conn_rate)
+        rd.rolling_cps.check_if_stable(rd.max_var_reference)
 
-        self.rolling_conns.update(self.c_tcp_established_conns)
-        self.rolling_conns.check_if_stable(self.max_var_reference)
+        rd.rolling_conns.update(rd.c_tcp_established_conns)
+        rd.rolling_conns.check_if_stable(rd.max_var_reference)
 
-        self.rolling_bw.update(self.c_total_bandwidth)
-        self.rolling_bw.check_if_stable(self.max_var_reference)
+        rd.rolling_bw.update(rd.c_total_bandwidth)
+        rd.rolling_bw.check_if_stable(rd.max_var_reference)
 
-        self.rolling_count_since_goal_seek.update(1)
-        self.rolling_count_since_goal_seek.check_if_stable(0)
+        rd.rolling_count_since_goal_seek.update(1)
+        rd.rolling_count_since_goal_seek.check_if_stable(0)
 
-    def check_kpi(self):
-        self.in_kpi_1 = self.in_kpi_1.lower()
-        if self.in_kpi_1 == "tps":
-            self.kpi_1 = self.rolling_tps
-        elif self.in_kpi_1 == "cps":
-            self.kpi_1 = self.rolling_cps
-        elif self.in_kpi_1 == "conns":
-            self.kpi_1 = self.rolling_conns
-        elif self.in_kpi_1 == "bw":
-            self.kpi_1 = self.rolling_bw
-        elif self.in_kpi_1 == "ttfb":
-            self.kpi_1 = self.rolling_ttfb
+    def check_kpi(self, rd):
+        rd.in_kpi_1 = rd.in_kpi_1.lower()
+        if rd.in_kpi_1 == "tps":
+            rd.kpi_1 = rd.rolling_tps
+        elif rd.in_kpi_1 == "cps":
+            rd.kpi_1 = rd.rolling_cps
+        elif rd.in_kpi_1 == "conns":
+            rd.kpi_1 = rd.rolling_conns
+        elif rd.in_kpi_1 == "bw":
+            rd.kpi_1 = rd.rolling_bw
+        elif rd.in_kpi_1 == "ttfb":
+            rd.kpi_1 = rd.rolling_ttfb
         else:
             log.debug(f"check_kpi unknown kpi_1, setting to TPS")
-            self.kpi_1 = self.rolling_tps
+            rd.kpi_1 = rd.rolling_tps
 
-        self.in_kpi_2 = self.in_kpi_2.lower()
-        if self.in_kpi_2 == "tps":
-            self.kpi_2 = self.rolling_tps
-        elif self.in_kpi_2 == "cps":
-            self.kpi_2 = self.rolling_cps
-        elif self.in_kpi_2 == "conns":
-            self.kpi_2 = self.rolling_conns
-        elif self.in_kpi_2 == "bw":
-            self.kpi_2 = self.rolling_bw
-        elif self.in_kpi_2 == "ttfb":
-            self.kpi_2 = self.rolling_ttfb
+        rd.in_kpi_2 = rd.in_kpi_2.lower()
+        if rd.in_kpi_2 == "tps":
+            rd.kpi_2 = rd.rolling_tps
+        elif rd.in_kpi_2 == "cps":
+            rd.kpi_2 = rd.rolling_cps
+        elif rd.in_kpi_2 == "conns":
+            rd.kpi_2 = rd.rolling_conns
+        elif rd.in_kpi_2 == "bw":
+            rd.kpi_2 = rd.rolling_bw
+        elif rd.in_kpi_2 == "ttfb":
+            rd.kpi_2 = rd.rolling_ttfb
         else:
             log.debug(f"check_kpi unknown kpi_2, setting to CPS")
-            self.kpi_2 = self.rolling_cps
+            rd.kpi_2 = rd.rolling_cps
 
-    def check_ramp_seek_kpi(self):
-        if self.in_ramp_seek_kpi == "tps":
-            self.ramp_seek_kpi = self.rolling_tps
-        elif self.in_ramp_seek_kpi == "cps":
-            self.ramp_seek_kpi = self.rolling_cps
-        elif self.in_ramp_seek_kpi == "conns":
-            self.ramp_seek_kpi = self.rolling_conns
-        elif self.in_ramp_seek_kpi == "bw":
-            self.ramp_seek_kpi = self.rolling_bw
-        elif self.in_ramp_seek_kpi == "ttfb":
-            self.ramp_seek_kpi = self.rolling_ttfb
+    def check_ramp_seek_kpi(self, rd):
+        if rd.in_ramp_seek_kpi == "tps":
+            rd.ramp_seek_kpi = rd.rolling_tps
+        elif rd.in_ramp_seek_kpi == "cps":
+            rd.ramp_seek_kpi = rd.rolling_cps
+        elif rd.in_ramp_seek_kpi == "conns":
+            rd.ramp_seek_kpi = rd.rolling_conns
+        elif rd.in_ramp_seek_kpi == "bw":
+            rd.ramp_seek_kpi = rd.rolling_bw
+        elif rd.in_ramp_seek_kpi == "ttfb":
+            rd.ramp_seek_kpi = rd.rolling_ttfb
         else:
             log.debug(f"check_ramp_seek_kpi unknown kpi, setting to TPS")
-            self.ramp_seek_kpi = self.rolling_tps
+            rd.ramp_seek_kpi = rd.rolling_tps
 
     @staticmethod
     def return_bool_true(check_if, is_value):
@@ -1268,7 +1378,7 @@ class CfRunTest:
             return True
         return False
 
-    def control_test(self):
+    def control_test(self, cf, rd):
         """Main test control
 
         Runs test. Start by checking if test is in running state followed by checking
@@ -1279,75 +1389,75 @@ class CfRunTest:
         :return: True if test completed successfully
         """
         # exit control_test if test does not go into running state
-        if not self.wait_for_running_status():
+        if not self.wait_for_running_status(cf, rd):
             log.info(f"control_test end, wait_for_running_status False")
             return False
         # exit control_test if test does not go into running state
-        if not self.wait_for_running_sub_status():
+        if not self.wait_for_running_sub_status(cf, rd):
             log.info(f"control_test end, wait_for_running_sub_status False")
             return False
         # exit control_test if test does not have successful transactions
-        if not self.wait_for_test_activity():
-            self.stop_wait_for_finished_status()
+        if not self.wait_for_test_activity(cf, rd):
+            self.stop_wait_for_finished_status(cf, rd)
             log.info(f"control_test end, wait_for_test_activity False")
             return False
-        self.check_ramp_seek_kpi()
-        self.check_kpi()
-        self.rolling_count_since_goal_seek.reset()
+        self.check_ramp_seek_kpi(rd)
+        self.check_kpi(rd)
+        rd.rolling_count_since_goal_seek.reset()
         # self.countdown(12)
         # test control loop - runs until self.stop is set to True
-        while not self.stop:
-            self.update_run_stats()
-            self.update_phase()
-            self.check_stop_conditions()
-            self.update_rolling_averages()
+        while not rd.stop:
+            self.update_run_stats(cf, rd)
+            self.update_phase(rd)
+            self.check_stop_conditions(rd)
+            self.update_rolling_averages(rd)
 
             # print stats if test is running
-            if self.sub_status is None:
-                self.print_test_stats()
-                self.save_results()
+            if rd.sub_status is None:
+                self.print_test_stats(rd)
+                self.save_results(rd)
 
-            if self.in_ramp_seek and not self.ramp_seek_complete:
+            if rd.in_ramp_seek and not rd.ramp_seek_complete:
                 log.info(f"control_test going to ramp_seek")
-                self.control_test_ramp_seek(self.ramp_seek_kpi, self.in_ramp_seek_value)
+                self.control_test_ramp_seek(rd, rd.ramp_seek_kpi, rd.in_ramp_seek_value)
 
-            if self.in_goal_seek and self.ramp_seek_complete:
+            if rd.in_goal_seek and rd.ramp_seek_complete:
                 log.info(f"control_test going to goal_seek")
-                self.control_test_goal_seek_kpi(self.kpi_1, self.kpi_2,
-                                                self.in_kpi_and_or)
+                self.control_test_goal_seek_kpi(rd, rd.kpi_1, rd.kpi_2,
+                                                rd.in_kpi_and_or)
             print(f"")
             time.sleep(4)
         # if goal_seek is yes enter sustained steady phase
-        if self.in_goal_seek and self.in_sustain_period > 0:
-            self.sustain_test()
+        if rd.in_goal_seek and rd.in_sustain_period > 0:
+            self.sustain_test(cf, rd)
         # stop test and wait for finished status
-        if self.stop_wait_for_finished_status():
-            self.time_to_stop = self.timer - self.time_to_stop_start
-            self.save_results()
+        if self.stop_wait_for_finished_status(cf, rd):
+            rd.time_to_stop = rd.timer - rd.time_to_stop_start
+            self.save_results(rd)
             return True
         return False
 
-    def check_stop_conditions(self):
+    def check_stop_conditions(self, rd):
         log.debug(f"in check_stop_conditions method")
         # stop test if time_remaining returned from controller == 0
-        if self.time_remaining == 0:
-            self.phase = "timeout"
+        if rd.time_remaining == 0:
+            rd.phase = "timeout"
             log.info(f"control_test end, time_remaining == 0")
-            self.stop = True
+            rd.stop = True
         # stop goal seeking test if time remaining is less than 30s
-        if self.time_remaining < 30 and self.in_goal_seek:
-            self.phase = "timeout"
+        if rd.time_remaining < 30 and rd.in_goal_seek:
+            rd.phase = "timeout"
             log.info(f"control_test end goal_seek, time_remaining < 30")
-            self.stop = True
-        elif self.time_remaining < 30 and self.in_ramp_seek:
-            self.phase = "timeout"
+            rd.stop = True
+        elif rd.time_remaining < 30 and rd.in_ramp_seek:
+            rd.phase = "timeout"
             log.info(f"control_test end ramp_seek, time_remaining < 30")
-            self.stop = True
-        if self.phase == "finished":
+            rd.stop = True
+        if rd.phase == "finished":
             log.info(f"control_test end, over duration time > phase: finished")
-            self.stop = True
+            rd.stop = True
 
-    def control_test_ramp_seek(self, ramp_kpi, ramp_to_value):
+    def control_test_ramp_seek(self, rd, ramp_kpi, ramp_to_value):
         """
         Increases load to a configured tps, cps, conns or bandwidth level.
         :return: True if no statements failed and there were no exceptions.
@@ -1357,43 +1467,43 @@ class CfRunTest:
         #log.debug("Inside the RunTest/ramp_to_seek method.")
         log.info(
             f"Inside the RunTest/ramp_to_seek method.\n"
-            f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
-            f"list: {self.rolling_count_since_goal_seek.list} "
+            f"rolling_count_list stable: {rd.rolling_count_since_goal_seek.stable} "
+            f"list: {rd.rolling_count_since_goal_seek.list} "
             f"\nramp_to_value: {ramp_to_value} ramp_kpi current: {ramp_kpi.current_value}"
             f" increase: {ramp_kpi.increase_avg}"
-            f"\n current load: {self.c_current_load}"
-            f" desired_load: {self.c_desired_load}"
+            f"\n current load: {rd.c_current_load}"
+            f" desired_load: {rd.c_desired_load}"
         )
-        if self.phase is not "rampseek":
-            log.info(f"phase {self.phase} is not 'rampseek', "
+        if rd.phase is not "rampseek":
+            log.info(f"phase {rd.phase} is not 'rampseek', "
                      f"returning from contol_test_ramp_seek")
             return
-        if not self.rolling_count_since_goal_seek.stable:
+        if not rd.rolling_count_since_goal_seek.stable:
             log.info(f"count since goal seek is not stable. "
-                     f"count list: {self.rolling_count_since_goal_seek.list}"
+                     f"count list: {rd.rolling_count_since_goal_seek.list}"
                      f"returning from control_test_ramp_seek")
             return
-        if self.max_load_reached:
+        if rd.max_load_reached:
             log.info(f"control_test_ramp_seek end, max_load_reached")
-            self.stop = True
+            rd.stop = True
             return
         # check if kpi avg is under set avg - if not, stop loop
         if ramp_to_value < ramp_kpi.current_value:
             log.info(f"ramp_to_value {ramp_to_value} < ramp_kpi.current_value {ramp_kpi.current_value}"
                      f"completed ramp_seek")
-            self.ramp_seek_complete = True
-            self.in_capacity_adjust = 1
+            rd.ramp_seek_complete = True
+            rd.in_capacity_adjust = 1
             return
 
-        if self.ramp_seek(ramp_kpi, ramp_to_value):
+        if self.ramp_seek(rd, ramp_kpi, ramp_to_value):
             # reset rolling count > no load increase until
             # at least the window size interval.
             # allows stats to stabilize after an increase
-            self.rolling_count_since_goal_seek.reset()
+            rd.rolling_count_since_goal_seek.reset()
         else:
             log.info(f"control_test_ramp_seek end, ramp_seek False")
-            self.ramp_seek_complete = True
-            self.in_capacity_adjust = 1
+            rd.ramp_seek_complete = True
+            rd.in_capacity_adjust = 1
             return
 
         if (ramp_kpi.current_value / ramp_to_value) > 0.95:
@@ -1402,32 +1512,32 @@ class CfRunTest:
                 f"ramp_to_value {ramp_to_value} > 0.95 "
                 f"increasing ramp_seek_count + 1")
             ramp_seek_count = ramp_seek_count + 1
-            if ramp_seek_count == self.in_ramp_step:
+            if ramp_seek_count == rd.in_ramp_step:
                 log.info(f"ramp_seek_complete early")
-                self.ramp_seek_complete = True
-                self.in_capacity_adjust = 1
+                rd.ramp_seek_complete = True
+                rd.in_capacity_adjust = 1
                 return
         return
 
-    def control_test_goal_seek_kpi(self, kpi_1,
+    def control_test_goal_seek_kpi(self, rd, kpi_1,
                                    kpi_2, kpis_and_bool):
         log.info(
-            f"rolling_count_list stable: {self.rolling_count_since_goal_seek.stable} "
-            f"list: {self.rolling_count_since_goal_seek.list} "
+            f"rolling_count_list stable: {rd.rolling_count_since_goal_seek.stable} "
+            f"list: {rd.rolling_count_since_goal_seek.list} "
             f"\nKpi1 stable: {kpi_1.stable} list: {kpi_1.list}"
             f"\nKpi2 stable: {kpi_2.stable} list: {kpi_2.list}"
         )
-        if self.phase is not "goalseek":
-            log.info(f"phase {self.phase} is not 'goalseek', "
+        if rd.phase is not "goalseek":
+            log.info(f"phase {rd.phase} is not 'goalseek', "
                      f"returning from contol_test_goal_seek")
             return
-        if not self.rolling_count_since_goal_seek.stable:
+        if not rd.rolling_count_since_goal_seek.stable:
             log.info(f"count since goal seek is not stable. "
-                     f"count list: {self.rolling_count_since_goal_seek.list}")
+                     f"count list: {rd.rolling_count_since_goal_seek.list}")
             return
-        if self.max_load_reached:
+        if rd.max_load_reached:
             log.info(f"control_test end, max_load_reached")
-            self.stop = True
+            rd.stop = True
             return
 
         if kpis_and_bool:
@@ -1442,106 +1552,104 @@ class CfRunTest:
                 goal_seek = False
 
         if goal_seek:
-            if self.goal_seek():
+            if self.goal_seek(rd):
                 # reset rolling count > no load increase until
                 # at least the window size interval.
                 # allows stats to stabilize after an increase
-                self.rolling_count_since_goal_seek.reset()
+                rd.rolling_count_since_goal_seek.reset()
             else:
                 log.info(f"control_test end, goal_seek False")
-                self.stop = True
+                rd.stop = True
 
-    def sustain_test(self):
-        self.phase = "steady"
-        while self.in_sustain_period > 0:
-            self.timer = int(round(time.time() - self.start_time))
+    def sustain_test(self, cf, rd):
+        rd.phase = "steady"
+        while rd.in_sustain_period > 0:
+            rd.timer = int(round(time.time() - rd.start_time))
             sustain_period_loop_time_start = time.time()
-            self.update_run_stats()
-            if self.time_remaining < 30 and self.in_goal_seek:
-                self.phase = "timeout"
-                self.in_sustain_period = 0
+            self.update_run_stats(cf, rd)
+            if rd.time_remaining < 30 and rd.in_goal_seek:
+                rd.phase = "timeout"
+                rd.in_sustain_period = 0
                 log.info(f"sustain_test end, time_remaining < 30")
-            # self.update_averages()
-            print(f"sustain period time left: {int(self.in_sustain_period)}")
+            print(f"sustain period time left: {int(rd.in_sustain_period)}")
 
             # print stats if test is running
-            if self.sub_status is None:
-                self.print_test_stats()
-                self.save_results()
+            if rd.sub_status is None:
+                self.print_test_stats(rd)
+                self.save_results(rd)
 
             time.sleep(4)
-            self.in_sustain_period = self.in_sustain_period - (
+            rd.in_sustain_period = rd.in_sustain_period - (
                 time.time() - sustain_period_loop_time_start
             )
-        self.phase = "stopping"
-        # self.stop_wait_for_finished_status()
+        rd.phase = "stopping"
+        # self.stop_wait_for_finished_status(cf, rd)
         return True
 
-    def save_results(self):
+    def save_results(self, rd):
 
         csv_list = [
-            self.in_name,
-            self.time_elapsed,
-            self.phase,
-            self.c_current_load,
-            self.c_desired_load,
-            self.rolling_count_since_goal_seek.stable,
-            self.c_http_successful_txns_sec,
-            self.rolling_tps.stable,
-            self.rolling_tps.increase_avg,
-            self.c_http_successful_txns,
-            self.c_http_unsuccessful_txns,
-            self.c_http_aborted_txns,
-            self.c_transaction_error_percentage,
-            self.c_tcp_established_conn_rate,
-            self.rolling_cps.stable,
-            self.rolling_cps.increase_avg,
-            self.c_tcp_established_conns,
-            self.rolling_conns.stable,
-            self.rolling_conns.increase_avg,
-            self.c_tcp_avg_tt_synack,
-            self.c_tcp_avg_ttfb,
-            self.rolling_ttfb.stable,
-            self.rolling_ttfb.increase_avg,
-            self.c_url_avg_response_time,
-            self.c_tcp_cumulative_established_conns,
-            self.c_tcp_cumulative_attempted_conns,
-            self.c_total_bandwidth,
-            self.rolling_bw.stable,
-            self.rolling_bw.increase_avg,
-            self.c_rx_bandwidth,
-            self.c_tx_bandwidth,
-            self.c_rx_packet_rate,
-            self.c_tx_packet_rate,
-            self.s_tcp_closed,
-            self.s_tcp_closed_reset,
-            self.s_tcp_closed_error,
-            self.c_simusers_alive,
-            self.c_simusers_animating,
-            self.c_simusers_blocking,
-            self.c_simusers_sleeping,
-            self.c_loadspec_avg_cpu,
-            self.c_memory_percent_used,
-            self.c_memory_packetmem_used,
-            self.c_memory_rcv_queue_length,
-            self.s_memory_avg_cpu,
-            self.s_memory_percent_used,
-            self.s_memory_packetmem_used,
-            self.s_memory_rcv_queue_length,
-            self.type_v1,
-            self.type_v2,
-            self.in_load_type,
-            self.test_id,
-            self.id,
-            self.time_to_run,
-            self.time_to_start,
-            self.time_to_activity,
-            self.time_to_stop,
+            rd.in_name,
+            rd.time_elapsed,
+            rd.phase,
+            rd.c_current_load,
+            rd.c_desired_load,
+            rd.rolling_count_since_goal_seek.stable,
+            rd.c_http_successful_txns_sec,
+            rd.rolling_tps.stable,
+            rd.rolling_tps.increase_avg,
+            rd.c_http_successful_txns,
+            rd.c_http_unsuccessful_txns,
+            rd.c_http_aborted_txns,
+            rd.c_transaction_error_percentage,
+            rd.c_tcp_established_conn_rate,
+            rd.rolling_cps.stable,
+            rd.rolling_cps.increase_avg,
+            rd.c_tcp_established_conns,
+            rd.rolling_conns.stable,
+            rd.rolling_conns.increase_avg,
+            rd.c_tcp_avg_tt_synack,
+            rd.c_tcp_avg_ttfb,
+            rd.rolling_ttfb.stable,
+            rd.rolling_ttfb.increase_avg,
+            rd.c_url_avg_response_time,
+            rd.c_tcp_cumulative_established_conns,
+            rd.c_tcp_cumulative_attempted_conns,
+            rd.c_total_bandwidth,
+            rd.rolling_bw.stable,
+            rd.rolling_bw.increase_avg,
+            rd.c_rx_bandwidth,
+            rd.c_tx_bandwidth,
+            rd.c_rx_packet_rate,
+            rd.c_tx_packet_rate,
+            rd.s_tcp_closed,
+            rd.s_tcp_closed_reset,
+            rd.s_tcp_closed_error,
+            rd.c_simusers_alive,
+            rd.c_simusers_animating,
+            rd.c_simusers_blocking,
+            rd.c_simusers_sleeping,
+            rd.c_loadspec_avg_cpu,
+            rd.c_memory_percent_used,
+            rd.c_memory_packetmem_used,
+            rd.c_memory_rcv_queue_length,
+            rd.s_memory_avg_cpu,
+            rd.s_memory_percent_used,
+            rd.s_memory_packetmem_used,
+            rd.s_memory_rcv_queue_length,
+            rd.type_v1,
+            rd.type_v2,
+            rd.in_load_type,
+            rd.test_id,
+            rd.id,
+            rd.time_to_run,
+            rd.time_to_start,
+            rd.time_to_activity,
+            rd.time_to_stop,
             script_version,
-            self.report_link,
+            rd.report_link,
         ]
         self.result_file.append_file(csv_list)
-
 
 class DetailedCsvReport:
     def __init__(self, report_location):
