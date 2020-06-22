@@ -22,6 +22,7 @@ class BaseTest:
             self.trafficPattern = base["config"]["trafficPattern"]
             self.testType = base["config"]["testType"]
             self.loadSpecification = base["config"]["loadSpecification"]
+            self.runtimeOptions= base["config"]["runtimeOptions"]
         except Exception as e:
             print(f"\nBase test missing data \n{e}")
 
@@ -63,6 +64,7 @@ class CfCreateTest(BaseTest):
         self.protocol = test_template["config"]["protocol"]
         self.existing_load_constraints = self.loadSpecification["constraints"]
         self.loadSpecification = test_template["config"]["loadSpecification"]
+        self.test_template_runtimeOptions= test_template["config"]["runtimeOptions"]
 
         self.cf_version = int("".join(i for i in cf_ver if i.isdigit()))
         self.cf_version = str(self.cf_version)
@@ -86,11 +88,21 @@ class CfCreateTest(BaseTest):
         comp_test["config"]["trafficPattern"] = self.trafficPattern
         comp_test["config"]["testType"] = self.testType
         comp_test["config"]["loadSpecification"] = self.loadSpecification
+        comp_test["config"]["runtimeOptions"] = self.test_template_runtimeOptions
         return comp_test
 
     def save_test(self, outfile):
         with open(outfile, "w") as f:
             json.dump(self.complete_test(), f, indent=4)
+
+    def update_runtimeOptions(self):
+        try:
+            keys = self.runtimeOptions.keys()
+            for key, value in self.test_template_runtimeOptions.items():
+                if key in keys:
+                    self.test_template_runtimeOptions[key] = self.runtimeOptions[key]
+        except Exception as e:
+            print(f"\nUnable to set runtime options\n{e}")
 
     def update_network_settings(self):
         try:
