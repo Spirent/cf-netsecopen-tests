@@ -37,8 +37,8 @@ class CfClient:
             f.write(str(resp))
         return True
     
-    def append_log_response(self, method, url, resp):
-        s = f'\n{method} {url}\n{resp}'
+    def append_log_response(self, method, status, url, resp):
+        s = f'\n{method} {status} {url}\n{resp}'
         with open(("response.log"), "a") as f:
             f.write(s)
         return True
@@ -83,7 +83,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
 
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         with open(outfile, "w") as f:
             json.dump(dict_response, f, indent=4)
         return dict_response
@@ -104,7 +104,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
 
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         with open(outfile, "w") as f:
             json.dump(dict_response, f, indent=4)
         return dict_response
@@ -128,7 +128,7 @@ class CfClient:
         self.exception_continue_check()
         print(response)
         dict_response = response.json()
-        self.append_log_response('post', url, dict_response)
+        self.append_log_response('post', response.status_code, url, dict_response)
         return dict_response
 
     def update_test(self, test_type, test_id, infile):
@@ -150,7 +150,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('put', url, dict_response)
+        self.append_log_response('put', response.status_code, url, dict_response)
         return dict_response
 
     def delete_test(self, test_type, test_id):
@@ -185,7 +185,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         return dict_response
 
     def start_test(self, test_id):
@@ -204,7 +204,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('put', url, dict_response)
+        self.append_log_response('put', response.status_code, url, dict_response)
         return dict_response
 
     def list_test_runs(self):
@@ -222,7 +222,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         return dict_response
 
     def get_test_run(self, test_run_id):
@@ -240,7 +240,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         return dict_response
 
     def fetch_test_run_statistics(self, test_run_id):
@@ -258,7 +258,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         return dict_response
 
     def stop_test(self, test_run_id):
@@ -276,7 +276,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('put', url, dict_response)
+        self.append_log_response('put', response.status_code, url, dict_response)
         return dict_response
 
     def change_load(self, test_run_id, new_load):
@@ -296,7 +296,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('put', url, dict_response)
+        self.append_log_response('put', response.status_code, url, dict_response)
         log.debug(f"change load: {load} > {json.dumps(dict_response, indent=4)}"
                   f"response: {response}")
         return dict_response
@@ -316,7 +316,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
-        self.append_log_response('get', url, dict_response)
+        self.append_log_response('get', response.status_code, url, dict_response)
         return dict_response
 
     def requests_error_handler(self, error_type, error_response, json_response):
