@@ -32,6 +32,17 @@ class CfClient:
         )
         self.__session.mount("https://", HTTPAdapter(max_retries=retries))
 
+    def create_log_response(self, resp):
+        with open(("response.log"), "w") as f:
+            f.write(str(resp))
+        return True
+    
+    def append_log_response(self, method, url, resp):
+        s = f'\n{method} {url}\n{resp}'
+        with open(("response.log"), "a") as f:
+            f.write(s)
+        return True
+
     def connect(self):
         self.exception_state = True
         log.debug("Inside the CfClient/connect method.")
@@ -52,15 +63,15 @@ class CfClient:
         self.exception_continue_check()
         dict_response = response.json()
         print(dict_response)
+        self.create_log_response(dict_response)
         if "token" in dict_response:
             self.__session.headers["Authorization"] = "Bearer " + dict_response["token"]
-
+        
     def get_test(self, test_type, test_id, outfile):
         self.exception_state = True
+        url = self.api + "/tests/" + test_type + "/" + test_id
         try:
-            response = self.__session.get(
-                self.api + "/tests/" + test_type + "/" + test_id
-            )
+            response = self.__session.get(url)
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
@@ -72,16 +83,16 @@ class CfClient:
             self.requests_error_handler("other", err, None)
 
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         with open(outfile, "w") as f:
             json.dump(dict_response, f, indent=4)
         return dict_response
 
     def fetch_test_template(self, test_type, outfile):
         self.exception_state = True
+        url = self.api + "/tests/" + test_type + "/template"
         try:
-            response = self.__session.get(
-                self.api + "/tests/" + test_type + "/template"
-            )
+            response = self.__session.get(url)
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
@@ -93,6 +104,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
 
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         with open(outfile, "w") as f:
             json.dump(dict_response, f, indent=4)
         return dict_response
@@ -101,10 +113,9 @@ class CfClient:
         self.exception_state = True
         with open(infile, "r") as f:
             intest = json.load(f)
+        url = self.api + "/tests/" + test_type + "/"
         try:
-            response = self.__session.post(
-                self.api + "/tests/" + test_type + "/", json=intest
-            )
+            response = self.__session.post(url, json=intest)
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
@@ -117,6 +128,7 @@ class CfClient:
         self.exception_continue_check()
         print(response)
         dict_response = response.json()
+        self.append_log_response('post', url, dict_response)
         return dict_response
 
     def update_test(self, test_type, test_id, infile):
@@ -124,10 +136,9 @@ class CfClient:
         with open(infile, "r") as f:
             intest = json.load(f)
             print(intest)
+        url = self.api + "/tests/" + test_type + "/" + test_id
         try:
-            response = self.__session.put(
-                self.api + "/tests/" + test_type + "/" + test_id, json=intest
-            )
+            response = self.__session.put(url, json=intest)
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
@@ -139,6 +150,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('put', url, dict_response)
         return dict_response
 
     def delete_test(self, test_type, test_id):
@@ -160,8 +172,9 @@ class CfClient:
 
     def get_queue(self, queue_id):
         self.exception_state = True
+        url = self.api + "/queues/" + queue_id
         try:
-            response = self.__session.get(self.api + "/queues/" + queue_id)
+            response = self.__session.get(url)
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -172,12 +185,14 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         return dict_response
 
     def start_test(self, test_id):
         self.exception_state = True
+        url = self.api + "/tests/" + test_id + "/start"
         try:
-            response = self.__session.put(self.api + "/tests/" + test_id + "/start")
+            response = self.__session.put(url)
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
@@ -189,12 +204,14 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('put', url, dict_response)
         return dict_response
 
     def list_test_runs(self):
         self.exception_state = True
+        url = self.api + "/test_runs"
         try:
-            response = self.__session.get(self.api + "/test_runs")
+            response = self.__session.get(url)
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -205,12 +222,14 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         return dict_response
 
     def get_test_run(self, test_run_id):
         self.exception_state = True
+        url = self.api + "/test_runs/" + test_run_id
         try:
-            response = self.__session.get(self.api + "/test_runs/" + test_run_id)
+            response = self.__session.get(url)
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -221,14 +240,14 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         return dict_response
 
     def fetch_test_run_statistics(self, test_run_id):
         self.exception_state = True
+        url = self.api + "/test_runs/" + test_run_id + "/statistics"
         try:
-            response = self.__session.get(
-                self.api + "/test_runs/" + test_run_id + "/statistics"
-            )
+            response = self.__session.get(url)
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -239,14 +258,14 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         return dict_response
 
     def stop_test(self, test_run_id):
         self.exception_state = True
+        url = self.api + "/test_runs/" + test_run_id + "/stop"
         try:
-            response = self.__session.put(
-                self.api + "/test_runs/" + test_run_id + "/stop"
-            )
+            response = self.__session.put(url)
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -257,15 +276,15 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('put', url, dict_response)
         return dict_response
 
     def change_load(self, test_run_id, new_load):
         self.exception_state = True
         load = {"load": new_load}
+        url = self.api + "/test_runs/" + test_run_id + "/changeload"
         try:
-            response = self.__session.put(
-                self.api + "/test_runs/" + test_run_id + "/changeload", data=load
-            )
+            response = self.__session.put(url, data=load)
             response.raise_for_status()
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
@@ -277,14 +296,16 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('put', url, dict_response)
         log.debug(f"change load: {load} > {json.dumps(dict_response, indent=4)}"
                   f"response: {response}")
         return dict_response
 
     def get_system_version(self):
         self.exception_state = True
+        url = self.api + "/system/version"
         try:
-            response = self.__session.get(self.api + "/system/version")
+            response = self.__session.get(url)
         except requests.exceptions.HTTPError as errh:
             self.requests_error_handler("http", errh, response)
         except requests.exceptions.ConnectionError as errc:
@@ -295,6 +316,7 @@ class CfClient:
             self.requests_error_handler("other", err, None)
         self.exception_continue_check()
         dict_response = response.json()
+        self.append_log_response('get', url, dict_response)
         return dict_response
 
     def requests_error_handler(self, error_type, error_response, json_response):
