@@ -324,7 +324,8 @@ class CfRunTest:
         rd.queue_id = rd.test_config["config"]["queue"]["id"]
         rd.queue_info = self.get_queue(cf, rd.queue_id)
 
-        self.init_capacity_adj(rd)
+        if not self.init_capacity_adj(rd):
+            return False
 
         self.init_update_config_load(rd)
         self.update_config_load_controller(cf, rd)
@@ -335,6 +336,7 @@ class CfRunTest:
         self.init_rolling_stats(rd)
         # create entry in result file at the start of test
         self.save_results(rd)
+        return True
 
     def init_input_csv(self, rd, test_details):
         rd.test_id = test_details["id"]
@@ -398,11 +400,14 @@ class CfRunTest:
         log.info(f"queue_capacity: {rd.queue_capacity}")
         if len(rd.queue_info["computeGroups"]) > 0:
             rd.core_count = self.core_count_lookup_cg(rd.queue_info)
+            log.info(f"core_count cg: {rd.core_count}")
             # self.capacity_adj_cg(rd)
         else:
             rd.core_count = self.core_count_lookup_spr(rd.queue_info)
+            log.info(f"core_count spr: {rd.core_count}")
             # self.capacity_adj_spr(rd)
-        log.info(f"core_count: {rd.core_count}")
+        if not self.check_config(rd):
+            return False
         rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
         log.info(f"client_port_count: {rd.client_port_count}")
         rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
@@ -421,29 +426,37 @@ class CfRunTest:
         )
         log.info(f"in_capacity_adjust: {rd.in_capacity_adjust}")
         rd.load_constraints = {"enabled": False}
+        return True
         
-
-    def capacity_adj_cg(self, rd):
-        rd.core_count = self.core_count_lookup_cg(rd.queue_info)
-        log.info(f"core_count: {rd.core_count}")
-        rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
-        log.info(f"client_port_count: {rd.client_port_count}")
-        rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
-        log.info(f"server_port_count: {rd.server_port_count}")
-        rd.client_core_count = int(
-            rd.core_count
-            / (rd.client_port_count + rd.server_port_count)
-            * rd.client_port_count
-        )
-        log.info(f"client_core_count: {rd.client_core_count}")
-        rd.in_capacity_adjust = self.check_capacity_adjust(
-            rd.in_capacity_adjust,
-            rd.in_load_type,
-            rd.client_port_count,
-            rd.client_core_count,
-        )
-        log.info(f"in_capacity_adjust: {rd.in_capacity_adjust}")
-        rd.load_constraints = {"enabled": False}
+    def check_config(self, rd):
+        if len(rd.test_config["config"]["interfaces"]) == 0:
+            errormsg = 'No subnets/interfaces assigned in test'
+            log.debug(errormsg)
+            print(errormsg)
+            return False
+        return True
+    
+    # def capacity_adj_cg(self, rd):
+    #     rd.core_count = self.core_count_lookup_cg(rd.queue_info)
+    #     log.info(f"core_count: {rd.core_count}")
+    #     rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
+    #     log.info(f"client_port_count: {rd.client_port_count}")
+    #     rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
+    #     log.info(f"server_port_count: {rd.server_port_count}")
+    #     rd.client_core_count = int(
+    #         rd.core_count
+    #         / (rd.client_port_count + rd.server_port_count)
+    #         * rd.client_port_count
+    #     )
+    #     log.info(f"client_core_count: {rd.client_core_count}")
+    #     rd.in_capacity_adjust = self.check_capacity_adjust(
+    #         rd.in_capacity_adjust,
+    #         rd.in_load_type,
+    #         rd.client_port_count,
+    #         rd.client_core_count,
+    #     )
+    #     log.info(f"in_capacity_adjust: {rd.in_capacity_adjust}")
+    #     rd.load_constraints = {"enabled": False}
         
     def init_update_config_load(self, rd):    
         if not self.update_config_load(rd):

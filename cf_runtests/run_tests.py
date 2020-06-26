@@ -44,7 +44,8 @@ for test in test_list:
         rd = RunData()
         rt = CfRunTest(cf, rd, test, detailed_report, output_dir)
         if rt is not False:
-            rt.init_sequence(cf, rd, test)
+            if not rt.init_sequence(cf, rd, test):
+                continue
             rt.control_test(cf, rd)
         # create reports
         table = Report(detailed_report.report_csv_file, col_order)
