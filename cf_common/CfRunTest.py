@@ -322,7 +322,7 @@ class CfRunTest:
 
         rd.test_config = self.get_test_config(cf, rd)
         rd.queue_id = rd.test_config["config"]["queue"]["id"]
-        rd.queue_info = self.get_queue(rd.queue_id)
+        rd.queue_info = self.get_queue(cf, rd.queue_id)
 
         self.init_capacity_adj(rd)
 
@@ -396,7 +396,35 @@ class CfRunTest:
     def init_capacity_adj(self, rd):
         rd.queue_capacity = int(rd.queue_info["capacity"])
         log.info(f"queue_capacity: {rd.queue_capacity}")
-        rd.core_count = self.core_count_lookup(rd.queue_info)
+        if len(rd.queue_info["computeGroups"]) > 0:
+            rd.core_count = self.core_count_lookup_cg(rd.queue_info)
+            # self.capacity_adj_cg(rd)
+        else:
+            rd.core_count = self.core_count_lookup_spr(rd.queue_info)
+            # self.capacity_adj_spr(rd)
+        log.info(f"core_count: {rd.core_count}")
+        rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
+        log.info(f"client_port_count: {rd.client_port_count}")
+        rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
+        log.info(f"server_port_count: {rd.server_port_count}")
+        rd.client_core_count = int(
+            rd.core_count
+            / (rd.client_port_count + rd.server_port_count)
+            * rd.client_port_count
+        )
+        log.info(f"client_core_count: {rd.client_core_count}")
+        rd.in_capacity_adjust = self.check_capacity_adjust(
+            rd.in_capacity_adjust,
+            rd.in_load_type,
+            rd.client_port_count,
+            rd.client_core_count,
+        )
+        log.info(f"in_capacity_adjust: {rd.in_capacity_adjust}")
+        rd.load_constraints = {"enabled": False}
+        
+
+    def capacity_adj_cg(self, rd):
+        rd.core_count = self.core_count_lookup_cg(rd.queue_info)
         log.info(f"core_count: {rd.core_count}")
         rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
         log.info(f"client_port_count: {rd.client_port_count}")
@@ -515,10 +543,10 @@ class CfRunTest:
             )
         return response
 
-    def get_queue(self, queue_id):
+    def get_queue(self, cf, queue_id):
         response = None
         try:
-            response = self.cf.get_queue(queue_id)
+            response = cf.get_queue(queue_id)
             log.debug(f"{json.dumps(response, indent=4)}")
         except Exception as detailed_exception:
             log.error(
@@ -528,10 +556,17 @@ class CfRunTest:
         return response
 
     @staticmethod
-    def core_count_lookup(queue_info):
+    def core_count_lookup_cg(queue_info):
         cores = 0
         for cg in queue_info["computeGroups"]:
             cores = cores + int(cg["cores"])
+        return cores
+
+    @staticmethod
+    def core_count_lookup_spr(queue_info):
+        cores = 0
+        for port in queue_info["ports"]:
+            cores = cores + int(port["cores"])
         return cores
 
     @staticmethod
