@@ -547,7 +547,7 @@ class CfRunTest:
         response = None
         try:
             response = cf.get_queue(queue_id)
-            log.debug(f"{json.dumps(response, indent=4)}")
+            # log.debug(f"{json.dumps(response, indent=4)}")
         except Exception as detailed_exception:
             log.error(
                 f"Exception occurred when retrieving test queue information: "
