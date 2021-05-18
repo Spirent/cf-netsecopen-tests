@@ -41,16 +41,26 @@ pip install -r requirements.txt
 11) Finally run the tests cd cf_runtests ; python3 ./run_tests.py (on a C100-S3, 4x100G this took about 3rs 45min)
 
 12) The results will be in the report dir:
+
 	jsutton$ pwd
+	
 	/Users/jsutton/Desktop/NSO/cf-netsecopen-tests-master/cf_runtests/report
+	
 	$ ls -l
+	
 	total 3944
+	
 	-rw-r--r--  1 jsutton  1275193766  1059622 May 28 03:26 20200527-2136_Detailed.csv
+	
 	-rw-r--r--  1 jsutton  1275193766    12871 May 28 03:26 20200527-2136_all.csv
+	
 	-rw-r--r--@ 1 jsutton  1275193766   298465 May 28 03:26 20200527-2136_all.html
+	
 	-rw-r--r--  1 jsutton  1275193766    76568 May 28 03:26 20200527-2136_kpi.html
+	
 	-rw-r--r--  1 jsutton  1275193766    47897 May 28 03:26 20200527-2136_sum.html
 	 
+
 
 In case of path errors when executing the scripts.
 Add project to python path (add the project, not the cf_runtest sub dir)
