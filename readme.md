@@ -1,6 +1,6 @@
 ## CyberFlood NetSecOPEN Automation Script
 
-### Installing and running the script
+### Installing the script
 Script requires python 3.7 or higher.
 
 To install python dependencies use following command:
@@ -9,17 +9,44 @@ pip install -r requirements.txt
 
 (if python3 use pip3 instead of pip)
 
-To use script:
-1. edit credentials.py
-2. set controller IP in config.py file
-3. configure a throughput test with queue and subnets on the controller (in a project)
-4. copy the test id from the browser url bar (last part of URL)
-5. paste test id under create_test.py section of config.py file
-6. optionally edit /input/create_tests_nso.csv file for tests to create
-7. run create_tests.py script: python create_tests.py (use python3 with multiple versions)
-8. edit capacity_adjust column in run_tests.csv. Default load is simuser per core.
-   E.g. for C100-S3 10G, use 3 (has 3 cores per port), 100G use 14. etc.
-9. run tests: python run_tests.py
+### Running the script
+ 1) edit ./cf_runtests/input/credentials.py
+ 
+ 2) set controller IP in ./cf_runtests/input/cf_config.py file
+  
+ 3) Create a test queue for the profile you want to test, for example Functional-4x100G
+  
+ 4) Next create a new project (don't copy the existing NSO project)and configure a single HTTP Throughput test and selectin the above Test Queue, next configure your Subnets/Networks as normal  (the Network Profiles and HTTP protocols options are set in create_tests_nso.csv file) and run this new test as we need the Test Run ID.
+  
+ 5) Once the test is completed, close the Live Charts and open your project and load the same HTTP Throughput test.
+  
+ 6) Copy the test id from the browser url bar (last part of URL)
+ 
+ 7) Next paste the same test id under create_test.py section of the cf_config.py file as shown below
+    # create_tests.py base test ID - use working HTTP Throughput test from controller.
+    # create_tests will use this ID to copy port group, subnets and other settings from.
+    create_tests_base_test_id = '6f9cf64409bdd97428a78f9509dab444'
+    create_test_source_csv = 'create_tests_nso.csv'  # located in input sub directory, do not put subdir in var
+    
+ 8) Optionally edit ./cf_runtests/input/create_tests_nso.csv file for number of tests to create, this is the "include" column (default setting will run 27 tests)
+ 
+ 9) Now create the tests cd cf_runtests ; python3 ./create_tests.py (this takes a couple seconds per test, once completed you will see the tests created in your Project)
+ 
+10) Optionally edit capacity_adjust column in ./cf_runtests/input/run_tests.csv file, this is the “capacity_adj” column. The default value, “auto” will set the load to SimUser per core. For further control this can be set for the profile, e.g. C100-S3 10G, use 3 (has 3 cores per port), S3-100G use 14, C200-100G use 16, etc.
+
+11) Finally run the tests cd cf_runtests ; python3 ./run_tests.py (on a C100-S3, 4x100G this took about 3rs 45min)
+
+12) The results will be in the report dir:
+	jsutton$ pwd
+	/Users/jsutton/Desktop/NSO/cf-netsecopen-tests-master/cf_runtests/report
+	$ ls -l
+	total 3944
+	-rw-r--r--  1 jsutton  1275193766  1059622 May 28 03:26 20200527-2136_Detailed.csv
+	-rw-r--r--  1 jsutton  1275193766    12871 May 28 03:26 20200527-2136_all.csv
+	-rw-r--r--@ 1 jsutton  1275193766   298465 May 28 03:26 20200527-2136_all.html
+	-rw-r--r--  1 jsutton  1275193766    76568 May 28 03:26 20200527-2136_kpi.html
+	-rw-r--r--  1 jsutton  1275193766    47897 May 28 03:26 20200527-2136_sum.html
+	 
 
 In case of path errors when executing the scripts.
 Add project to python path (add the project, not the cf_runtest sub dir)
