@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 	jsutton$ pwd
 	
-	/Users/jsutton/Desktop/NSO/cf-netsecopen-tests-master/cf_runtests/report
+	./cf_runtests/report
 	
 	$ ls -l
 	
