@@ -23,9 +23,13 @@ pip install -r requirements.txt
  6) Copy the test id from the browser url bar (last part of URL)
  
  7) Next paste the same test id under create_test.py section of the cf_config.py file as shown below
-    # create_tests.py base test ID - use working HTTP Throughput test from controller.
-    # create_tests will use this ID to copy port group, subnets and other settings from.
+ 
+    #create_tests.py base test ID - use working HTTP Throughput test from controller
+   
+    #create_tests will use this ID to copy port group, subnets and other settings from
+   
     create_tests_base_test_id = '6f9cf64409bdd97428a78f9509dab444'
+   
     create_test_source_csv = 'create_tests_nso.csv'  # located in input sub directory, do not put subdir in var
     
  8) Optionally edit ./cf_runtests/input/create_tests_nso.csv file for number of tests to create, this is the "include" column (default setting will run 27 tests)
