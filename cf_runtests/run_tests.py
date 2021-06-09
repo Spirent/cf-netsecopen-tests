@@ -27,7 +27,7 @@ with open(tests_to_run, "r") as f:
     reader = csv.DictReader(f)
     test_list = list(reader)
 # sort tests by run_order column
-test_list = sorted(test_list, key=lambda k: k["run_order"])
+test_list = sorted(test_list, key=lambda k: int(k["run_order"]))
 log.debug(f"test list:\n{test_list}")
 
 detailed_report = DetailedCsvReport(report_dir)
