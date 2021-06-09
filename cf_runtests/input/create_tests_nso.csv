@@ -81,3 +81,9 @@ N,T08-TLS-LAT-CPS-EC-RSA4K-A256-GCM-S3-1K,http_connections_per_second,keepalive,
 N,T08-TLS-LAT-CPS-EC-RSA4K-A256-GCM-S3-64K,http_connections_per_second,keepalive,FALSE,1,0,sec,fixed-random,64000,11680,65538,10,1460,1440,3,TRUE,tlsv12,rsa4096,ECDHE-RSA-AES256-GCM-SHA384,secp256r1,RSA_PKCS1_SHA384,16383,FALSE,GET,none,auto
 Y,T05-HTTP-CON-1K,open_connections,keepalive,TRUE,10,96,sec,fixed-random,1000,2920,65538,10,1460,1440,3,FALSE,none,none,none,none,none,none,FALSE,GET,none,auto
 Y,T09-TLS-CON-EC-RSA2K-A128-GCM-S2-1K,open_connections,keepalive,TRUE,10,96,sec,fixed-random,1000,2920,65538,10,1460,1440,3,TRUE,tlsv12,server_2048,ECDHE-RSA-AES128-GCM-SHA256,secp256r1,RSA_PKCS1_SHA256,16383,FALSE,GET,none,auto
+N,AMT-HTTP-TPUT-256K,advanced_mixed_traffic,keepalive,TRUE,10,0,sec,fixed-random,256000,11680,65538,10,1460,1440,3,FALSE,none,none,none,none,none,none,FALSE,GET,none,auto
+N,AMT-HTTP-TPUT-256K-POST,advanced_mixed_traffic,keepalive,TRUE,10,0,sec,fixed-random,256000,11680,65538,10,1460,1440,3,FALSE,none,none,none,none,none,none,FALSE,POST,256000,auto
+N,AMT-TLS12-TPUT-EC-RSA2K-A128-GCM-S2-256K,advanced_mixed_traffic,keepalive,TRUE,10,0,sec,fixed-random,256000,11680,65538,10,1460,1440,3,TRUE,tlsv12,server_2048,ECDHE-RSA-AES128-GCM-SHA256,secp256r1,RSA_PKCS1_SHA256,16383,FALSE,GET,none,auto
+N,AMT-TLS12-TPUT-EC-RSA2K-A128-GCM-S2-256K-POST,advanced_mixed_traffic,keepalive,TRUE,10,0,sec,fixed-random,256000,11680,65538,10,1460,1440,3,TRUE,tlsv12,server_2048,ECDHE-RSA-AES128-GCM-SHA256,secp256r1,RSA_PKCS1_SHA256,16383,FALSE,POST,256000,auto
+N,AMT-HTTP-CPS-1K,advanced_mixed_traffic,separate,FALSE,1,0,sec,fixed-random,1000,2920,65538,10,1460,1440,3,FALSE,none,none,none,none,none,none,FALSE,GET,none,auto
+N,AMT-TLS12-CPS-EC-DSA256-A128-GCM-S2-1K,advanced_mixed_traffic,separate,FALSE,1,0,sec,fixed-random,1000,2920,65538,10,1460,1440,3,TRUE,tlsv12,prime256v1,ECDHE-ECDSA-AES128-GCM-SHA256,secp256r1,ECDSA_SECP256R1_SHA256,16383,FALSE,GET,none,auto

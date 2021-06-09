@@ -57,14 +57,23 @@ class CfCreateTest(BaseTest):
         self.post_size = self.chk_none(test_info["post_size"])
         self.name_suffix = test_info["name_suffix"]
         self.name = self.name + "_" + self.name_suffix
+        self.test_template_config = test_template["config"]
 
         self.existing_certificate = self.protocol["supplemental"]["sslTls"][
             "certificate"
         ]
-        self.protocol = test_template["config"]["protocol"]
+        if "protocol" in self.test_template_config:
+            self.protocol = test_template["config"]["protocol"]
         self.existing_load_constraints = self.loadSpecification["constraints"]
         self.loadSpecification = test_template["config"]["loadSpecification"]
-        self.test_template_runtimeOptions= test_template["config"]["runtimeOptions"]
+        if self.type not in ["advanced_mixed_traffic"]:
+            self.test_template_runtimeOptions = test_template["config"]["runtimeOptions"]
+        else:
+            self.test_template_runtimeOptions = test_template["config"]["runTimeOptions"]
+            self.amt_predefinedprotocols = test_template["config"]["trafficMix"]["mixer"]
+            self.get_amt_keyinfo()
+            self.update_amt_mixer()
+            self.mixer_config = self.mixer[0].get("config",{})
 
         self.cf_version = int("".join(i for i in cf_ver if i.isdigit()))
         self.cf_version = str(self.cf_version)
@@ -76,24 +85,145 @@ class CfCreateTest(BaseTest):
         comp_test = {}
         comp_test["name"] = self.name
         comp_test["projectId"] = self.projectId
-        comp_test["config"] = {}
-        comp_test["config"]["queue"] = self.queue
-        comp_test["config"]["debug"] = self.debug
-        comp_test["config"]["subnets"] = self.subnets
-        comp_test["config"]["criteria"] = self.criteria
-        comp_test["config"]["networks"] = self.networks
-        comp_test["config"]["interfaces"] = self.interfaces
-        comp_test["config"]["protocol"] = self.protocol
-        comp_test["config"]["virtualRouters"] = self.virtualRouters
-        comp_test["config"]["trafficPattern"] = self.trafficPattern
-        comp_test["config"]["testType"] = self.testType
-        comp_test["config"]["loadSpecification"] = self.loadSpecification
-        comp_test["config"]["runtimeOptions"] = self.test_template_runtimeOptions
+        if self.type in ["advanced_mixed_traffic"]:
+            comp_test["config"] = self.test_template_config
+            comp_test["config"]["queue"] = self.queue
+            comp_test["config"]["subnets"] = self.subnets
+            comp_test["config"]["networks"] = self.networks
+            comp_test["config"]["relationships"] = self.relationships
+            comp_test["config"]["virtualRouters"] = self.virtualRouters
+            comp_test["config"]["virtualRoutersToPorts"] = self.virtualRoutersToPorts
+            comp_test["config"]["trafficMix"]["mixer"] = self.mixer
+            comp_test["config"]["trafficMix"]["mixer"][0]["config"] = self.mixer_config
+            comp_test["config"]["loadSpecification"] = self.loadSpecification
+            comp_test["config"]["runtimeOptions"] = self.test_template_runtimeOptions
+        else:
+            comp_test["config"] = {}
+            comp_test["config"]["queue"] = self.queue
+            comp_test["config"]["debug"] = self.debug
+            comp_test["config"]["subnets"] = self.subnets
+            comp_test["config"]["criteria"] = self.criteria
+            comp_test["config"]["networks"] = self.networks
+            comp_test["config"]["interfaces"] = self.interfaces
+            comp_test["config"]["protocol"] = self.protocol
+            comp_test["config"]["virtualRouters"] = self.virtualRouters
+            comp_test["config"]["trafficPattern"] = self.trafficPattern
+            comp_test["config"]["testType"] = self.testType
+            comp_test["config"]["loadSpecification"] = self.loadSpecification
+            comp_test["config"]["runtimeOptions"] = self.test_template_runtimeOptions
         return comp_test
 
     def save_test(self, outfile):
         with open(outfile, "w") as f:
             json.dump(self.complete_test(), f, indent=4)
+
+    def get_amt_keyinfo(self):
+        testname = self.name.lower()
+        self.amt_protocol = []
+        self.amt_keyinfo = []
+        if self.connection_type.lower() == "separate" and self.keep_alive.lower() == "false":
+            test_type = "CPS"
+        elif self.http_method.lower() == "post" and self.keep_alive.lower() == "true":
+            test_type = "POST"
+        elif self.connection_type.lower() == "keepalive" and self.keep_alive.lower() == "true":
+            test_type = "TPUT"
+        else:
+            test_type = "TPUT"
+        if self.tls.lower() == "true":
+            self.amt_protocol.append("HTTPS")
+            self.amt_keyinfo.append({"HTTPS": test_type})
+        else:
+            self.amt_protocol.append("HTTP")
+            self.amt_keyinfo.append({"HTTP": test_type})
+
+    def get_amt_actions(self, keyinfo):
+        action = []
+        action_http = "1 GET http://<AUTO_ASSIGN_HOST>:80"
+        action_https = "1 GET https://<AUTO_ASSIGN_HOST>:443"
+        action_http_post = f"1 POST http://<AUTO_ASSIGN_HOST>:80/<POST_BODY: URLENC KEY=spirent, \
+                             LENGTH={self.post_size}, FIXED>"
+        action_https_post = f"1 POST https://<AUTO_ASSIGN_HOST>:443/<POST_BODY: URLENC KEY=spirent, \
+                             LENGTH={self.post_size}, FIXED>"
+        actions = {"HTTP": {"TPUT": ["LOOP NewLoop START COUNT=10", action_http, "LOOP NewLoop STOP"],
+                            "POST": ["LOOP NewLoop START COUNT=10", action_http_post, "LOOP NewLoop STOP"],
+                             "CPS": [action_http, action_http, action_http, action_http]
+                            },
+                  "HTTPS": {"TPUT": ["LOOP NewLoop START COUNT=10", action_https, "LOOP NewLoop STOP"],
+                            "POST": ["LOOP NewLoop START COUNT=10", action_https_post, "LOOP NewLoop STOP"],
+                             "CPS": [action_https, action_https, action_https, action_https]
+                            },
+                  "HTTP2": {"TPUT": ["LOOP NewLoop START COUNT=10", action_http, "LOOP NewLoop STOP"],
+                             "CPS": [action_http, action_http, action_http, action_http]
+                            },
+                  "FTP": []
+                   }
+        if type(keyinfo) == dict:
+            for key, value in keyinfo.items():
+                if key in ["HTTP", "HTTPS", "HTTP2"]:
+                    action = actions[key][value]
+        else:
+            action = actions[keyinfo]
+        return action
+
+    def update_amt_mixer(self):
+        self.mixer = []
+        try:
+            for i in range(0, len(self.amt_protocol)):
+                predefinedprotocols = self.amt_protocol[i]
+                if self.amt_protocol[i] == "HTTPS":
+                    predefinedprotocols = "HTTP"
+                for j in range(0, len(self.amt_predefinedprotocols)):
+                    if predefinedprotocols == self.amt_predefinedprotocols[j].get("name", ""):
+                        template = self.amt_predefinedprotocols[j]
+                        action = self.get_amt_actions(self.amt_keyinfo[i])
+                        template["config"]["client"]["actionList"]["actions"] = action
+                        if self.amt_protocol[i] == "HTTPS":
+                            template["name"] = self.amt_protocol[i]
+                            template["config"]["client"]["actionList"]["name"] = self.amt_protocol[i]
+                            template["config"]["server"]["port"] = 443
+                        self.mixer.append(template)
+                        break
+            length = len(self.mixer)
+            percentage = round(100 / length, 1)
+            for i in range(0, length):
+                self.mixer[i]["percentage"] = percentage
+        except Exception as e:
+            print(f"\nUnable to set mixer\n{e}")
+
+    def configure_amt_relationships(self):
+        self.relationships = []
+        length = len(self.interfaces["client"])
+        if length == 0:
+            return
+        try:
+            for i in range(0, length):
+                length_subnets = len(self.interfaces["client"][i]["subnetIds"])
+                for j in range(0, length_subnets):
+                    for protocol in self.amt_protocol:
+                        relationship = {"server": {}, "protocols": "", "client": {}}
+                        relationship["protocols"] = [protocol]
+                        for side in ["server", "client"]:
+                            relationship[side]["subnetId"] = self.interfaces[side][i]["subnetIds"][j]
+                            relationship[side]["portSystemId"] = self.interfaces[side][i]["portSystemId"]
+                        self.relationships.append(relationship)
+        except Exception as e:
+            print(f"\nUnable to set relationships\n{e}")
+
+    def configure_amt_virtualrouterstoports(self):
+        if not self.virtualRouters:
+            self.virtualRoutersToPorts = {}
+            return
+        self.virtualRoutersToPorts = {"client": [], "server": []}
+        length = len(self.interfaces["client"])
+        try:
+            for i in range(0, length):
+                for side in ["client", "server"]:
+                    vr_to_port = {}
+                    vr_to_port["portSystemId"] = self.relationships[i][side]["portSystemId"]
+                    vr_to_port["virtualRouterId"] = self.virtualRouters[side][i]["id"]
+                    self.virtualRoutersToPorts[side].append(vr_to_port)
+        except Exception as e:
+            print(f"\nUnable to set virtualrouterstoports\n{e}")
 
     def update_runtimeOptions(self):
         try:
@@ -178,6 +308,11 @@ class CfCreateTest(BaseTest):
             self.protocol["keepAlive"]["delayTimeUnit"] = delay_time_unit
         except Exception as e:
             print(f"\nUnable to set per request delay_time and unit \n{e}")
+        if self.type == "open_connections" and self.protocol["keepAlive"]["enabled"] == True:
+            try:
+                self.protocol["keepAlive"]["delayType"] = "perTransaction"
+            except Exception as e:
+                print(f"\nUnable to set per request delay_type \n{e}")
 
     def update_http_method(self, http_method, post_size):
         if http_method.lower() == "post":
@@ -410,14 +545,18 @@ class CfCreateTest(BaseTest):
             return value
 
     def update_config_changes(self):
+        if self.type == "advanced_mixed_traffic":
+            self.configure_amt_relationships()
+            self.configure_amt_virtualrouterstoports()
+            self.protocol = self.mixer_config["client"]
+        if self.type != "advanced_mixed_traffic":
+            self.update_runtimeOptions()
+            self.update_close_with_fin()
         self.update_network_settings()
         self.update_criteria_settings()
         # self.update_load_constraints()
-        self.update_close_with_fin()
-        if 19300000 < self.cf_version:
+        if 19300000 < self.cf_version and self.type != "advanced_mixed_traffic":
             self.update_http_method(self.http_method, self.post_size)
-        if self.object_size is not None:
-            self.update_object_size(self.object_type, self.object_size)
         if self.keep_alive is not None:
             self.update_transactions(
                 self.connection_type,
@@ -426,6 +565,15 @@ class CfCreateTest(BaseTest):
                 self.delay_time,
                 self.delay_time_unit,
             )
+        if self.type == "advanced_mixed_traffic":
+            self.mixer_config["client"] = self.protocol
+            self.protocol = self.mixer_config["server"]
+            self.update_close_with_fin()
+        if self.object_size is not None:
+            self.update_object_size(self.object_type, self.object_size)
+        if self.type == "advanced_mixed_traffic":
+            self.mixer_config["server"] = self.protocol
+            self.protocol = self.mixer_config
         if self.tls is not None:
             self.update_tls(
                 self.tls,
@@ -437,7 +585,8 @@ class CfCreateTest(BaseTest):
                 self.tls_record,
                 self.payload_encryption_offload,
             )
-
+        if self.type == "advanced_mixed_traffic":
+            self.mixer_config = self.protocol
 
 class TestsToRun:
     def __init__(self, reference_to_run_csv_file, test_to_run_csv_file):
@@ -453,8 +602,10 @@ class TestsToRun:
 
     def add_test(self, new_test_dict, test_type):
         test_ref_match = False
+        new_test_name = new_test_dict["name"].rsplit("_", 1)[0]
         for test in self.reference_tests:
-            if new_test_dict["name"].startswith(test["name"]):
+            #if new_test_dict["name"].startswith(test["name"]):
+            if new_test_name == test["name"]:
                 test_csv_info = self.test_csv_line_values(
                     test, new_test_dict, test_type
                 )

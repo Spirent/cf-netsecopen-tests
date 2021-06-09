@@ -104,9 +104,30 @@ class CfClient:
             self.requests_error_handler("other", err, None)
 
         dict_response = response.json()
+        if test_type == "advanced_mixed_traffic":
+            dict_response["config"]["trafficMix"]["mixer"] = self.fetch_amt_predefinedprotocols()
         self.append_log_response('get', response.status_code, url, dict_response)
         with open(outfile, "w") as f:
             json.dump(dict_response, f, indent=4)
+        return dict_response
+
+    def fetch_amt_predefinedprotocols(self):
+        self.exception_state = True
+        url = self.api + "/tests/advanced_mixed_traffic/predefined_protocols"
+        try:
+            response = self.__session.get(url)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as errh:
+            self.requests_error_handler("http", errh, response)
+        except requests.exceptions.ConnectionError as errc:
+            self.requests_error_handler("connection", errc, None)
+        except requests.exceptions.Timeout as errt:
+            self.requests_error_handler("timeout", errt, None)
+        except requests.exceptions.RequestException as err:
+            self.requests_error_handler("other", err, None)
+
+        dict_response = response.json()
+        self.append_log_response('get', response.status_code, url, dict_response)
         return dict_response
 
     def post_test(self, test_type, infile):
@@ -246,6 +267,24 @@ class CfClient:
     def fetch_test_run_statistics(self, test_run_id):
         self.exception_state = True
         url = self.api + "/test_runs/" + test_run_id + "/statistics"
+        try:
+            response = self.__session.get(url)
+        except requests.exceptions.HTTPError as errh:
+            self.requests_error_handler("http", errh, response)
+        except requests.exceptions.ConnectionError as errc:
+            self.requests_error_handler("connection", errc, None)
+        except requests.exceptions.Timeout as errt:
+            self.requests_error_handler("timeout", errt, None)
+        except requests.exceptions.RequestException as err:
+            self.requests_error_handler("other", err, None)
+        self.exception_continue_check()
+        dict_response = response.json()
+        self.append_log_response('get', response.status_code, url, dict_response)
+        return dict_response
+
+    def fetch_event_logs(self, test_run_id):
+        self.exception_state = True
+        url = self.api + "/test_runs/" + test_run_id + "/eventlogs"
         try:
             response = self.__session.get(url)
         except requests.exceptions.HTTPError as errh:

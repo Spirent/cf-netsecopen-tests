@@ -167,7 +167,7 @@ class RunData:
     in_kpi_and_or: str = 'AND'
     in_threshold_low: float = 20.0
     in_threshold_med: float = 5.0
-    in_threshold_high: float= 1.0
+    in_threshold_high: float = 1.0
     variance_sample_size: int = 3
     in_max_variance: float = 0.03
     in_ramp_low: int = 60
@@ -181,6 +181,7 @@ class RunData:
 
     living_simusers_max_bool: bool = False
     living_simusers_max: int = 1 
+    simuser_birth_rate_max_bool: bool = False
 
     in_goal_seek: bool = False
     first_steady_interval: bool = True
@@ -190,6 +191,7 @@ class RunData:
     queue_info: dict = None
     queue_capacity: int = 60
     core_count: int = 6
+    port_count: int = 1
     client_port_count: int = 1
     server_port_count: int = 1
     client_core_count: int = 3
@@ -310,12 +312,152 @@ class RunData:
     time_to_stop: int = 0
     test_started: bool = False
 
+class CfOpenConns:
+    def __init__(self, rt):
+        self.rt = rt  # the CfRunTest object
+        self.disabled = True
+        self.got_startup_data = False
+        self.first_new_load = True
+        self.changed_load_highest = 0
+        # power of 2 dividing the distance between starting open conns load and max load
+        # (e.g.2**5 = 32 steps from current to max)
+        self.steps_to_max = 3
+        self.current_step = 1
+        self.tracker_mapper = (
+            ("setpoint", "c_desired_load"),
+            ("load", "c_current_load"),
+            ("memory", "c_memory_main_used"),
+            ("cps", "c_tcp_established_conn_rate"),
+        )
+        self.tracker = {}
+
+    def enable(self):
+        self.disabled = False
+        log.info("CfOpenConns enabled")
+
+    def expect_unused(self, unused_point):
+        log.warning(f"CfOpenConns surprise used: {unused_point}")
+
+    def set_startup_data(self):
+        if (
+            self.disabled
+            or self.got_startup_data
+            or self.rt.rd.c_http_successful_txns_sec == 0
+        ):
+            return
+        self.got_startup_data = True
+        self.c_startup_mem = self.rt.rd.c_memory_main_used
+        self.c_startup_load = self.rt.rd.c_current_load
+        self.c_new_conns_mem = self.rt.rd.c_memory_main_size - self.c_startup_mem
+        log.info(
+            f"CfOpenConns -- c_startup_mem: {self.c_startup_mem}; c_startup_load: "
+            f"{self.c_startup_load}; c_conns_mem: {self.c_new_conns_mem}"
+        )
+
+    def capture_goal_seek_iteration(self):
+        if self.disabled:
+            return
+        t = time.time()
+        self.tracker[t] = {}
+        for key, data_name in self.tracker_mapper:
+            exec(f"self.tracker[t]['{key}'] = self.rt.rd.{data_name}")
+        log.debug(f"CfOpenConns -- {t-self.rt.rd.start_time:.2f}: {self.tracker[t]}")
+
+    def skip_goal_seek(self):
+        if self.disabled:
+            return False
+        if self.disabled:
+            return False
+        current = self.rt.rd.c_current_load
+        desired = self.rt.rd.c_desired_load
+        ratio = current / desired
+        log.info(
+            f"CfOpenConns -- current/desired load: {current:,}/{desired:,} "
+            f"({ratio:.1%})"
+        )
+        diff = abs(ratio - 1)
+        allowed = 0.015
+        if diff > allowed:
+            log.info(f"Skip load update, diff>allowed: {diff:.1%}>{allowed:.1%}")
+            return True
+        return False
+
+    def dump_iteration_data(self, csv_file):
+        if self.disabled:
+            return
+        field_names = ["time"] + [x[0] for x in self.tracker_mapper]
+        dw = csv.DictWriter(csv_file, field_names)
+        dw.writeheader()
+        for time_key in self.tracker:
+            row_dict = {"time": f"{time_key - self.rt.rd.start_time:.2f}"}
+            row_dict.update(self.tracker[time_key])
+            dw.writerow(row_dict)
+
+    def is_load_type_conns(self):
+        return not self.disabled
+
+    def get_new_load(self):
+        if (
+            self.rt.rd.c_current_desired_load_variance >= 1.0
+            and self.rt.rd.c_memory_percent_used < 100
+            and self.rt.rd.s_memory_percent_used < 100
+        ):
+            pass
+        else:
+            self.rt.rd.max_load_reached = True
+        if (
+            self.rt.rd.rolling_conns.increase_avg == 0
+            and self.rt.rd.c_memory_percent_used > 99.5
+        ):
+            self.rt.rd.max_load_reached = True
+        if self.rt.rd.max_load_reached == True:
+            log.info("CfOpenConns -- No more load increase; stop seeking.")
+            return False
+        if self.first_new_load:
+            if self.rt.rd.c_current_load - self.c_startup_load > 0:
+                self.c_mem_per_conn = (self.rt.rd.c_memory_main_used - self.c_startup_mem) / (
+                    self.rt.rd.c_current_load - self.c_startup_load
+                )
+                self.inc_conns_within_c_mem = int(
+                    0.95 * self.c_new_conns_mem / self.c_mem_per_conn
+                )
+                log.info(
+                    f"CfOpenConns -- c_mem_per_conn: {self.c_mem_per_conn}; "
+                    f"self.inc_conns_within_c_mem: {self.inc_conns_within_c_mem}"
+                )
+            self.first_new_load = False
+        if self.rt.rd.c_memory_percent_used > 97:
+            self.current_step = 0
+            self.inc_conns_within_c_mem = self.rt.rd.in_incr_high * self.rt.rd.in_capacity_adjust
+        elif self.current_step > self.steps_to_max and self.rt.rd.c_memory_percent_used <= 97:
+            self.current_step = 1
+            self.c_new_conns_mem = self.rt.rd.c_memory_main_size - self.rt.rd.c_memory_main_used
+            self.inc_conns_within_c_mem = int(self.c_new_conns_mem / self.c_mem_per_conn)
+        if self.current_step <= self.steps_to_max:
+            binary_deductor = 1 / (2 ** self.current_step)
+        # bincurrent_stepary deductor generates a progression like this: 1/2, 1/4, 1/8, ..., 0
+        new_load = self.rt.rd.c_current_load +  int(binary_deductor * self.inc_conns_within_c_mem)
+        log.info(
+            f"CfOpenConns -- current_step: {self.current_step}; "
+            f"cur load: {self.rt.rd.c_current_load}, new_load: {new_load}, add load: {binary_deductor * self.inc_conns_within_c_mem}"
+        )
+        self.current_step += 1
+        if new_load < self.changed_load_highest:
+            new_load = self.changed_load_highest
+        else:
+            self.changed_load_highest = new_load
+        return new_load
+
 class CfRunTest:
     def __init__(self, cf, rd, test_details, result_file, temp_file_dir):
         log.info(f"script version: {script_version}")
         self.cf = cf  # CfClient instance
+        self.rd = rd
+        #log.info(f"self.rd is: {self.rd}")
+        self.ocj = CfOpenConns(self)  # special behavior for open conns tests
         self.result_file = result_file
         self.temp_dir = temp_file_dir
+        self.test = test_details
 
     def init_sequence(self, cf, rd, test_details):
         self.init_input_csv(rd, test_details)
@@ -323,6 +465,9 @@ class CfRunTest:
         rd.test_config = self.get_test_config(cf, rd)
         rd.queue_id = rd.test_config["config"]["queue"]["id"]
         rd.queue_info = self.get_queue(cf, rd.queue_id)
+        log.info(f"queue info: \n{json.dumps(rd.queue_info, indent=4)}")
+        self.init_simuser_birth_rate_max(rd)
+        self.software_version_lookup(rd.queue_info)
 
         if not self.init_capacity_adj(rd):
             return False
@@ -395,26 +540,45 @@ class CfRunTest:
         rd.start_time = time.time()
         rd.timer = time.time() - rd.start_time
 
+    def init_simuser_birth_rate_max(self, rd):
+        if not (rd.type_v2 == "open_connections" and rd.in_load_type == "simusers"):
+            self.test["simuser_birth_rate_max"] = "none"
+            return
+        sslTls_enabled = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("enabled", False)
+        if sslTls_enabled:
+            self.test["simuser_birth_rate_max"] = 30
+        else:
+            self.test["simuser_birth_rate_max"] = 450
+        rd.simuser_birth_rate_max_bool = self.check_if_number(
+            self.test.get("simuser_birth_rate_max", False))
+        rd.simuser_birth_rate_max = self.return_int_if_present(
+            rd.simuser_birth_rate_max_bool,
+            self.test.get("simuser_birth_rate_max", False))
+
     def init_capacity_adj(self, rd):
         rd.queue_capacity = int(rd.queue_info["capacity"])
         log.info(f"queue_capacity: {rd.queue_capacity}")
         if len(rd.queue_info["computeGroups"]) > 0:
-            rd.core_count = self.core_count_lookup_cg(rd.queue_info)
-            log.info(f"core_count cg: {rd.core_count}")
+            rd.core_count,rd.port_count = self.core_count_lookup_cg(rd.queue_info)
+            log.info(f"core_count cg and port count cg: {rd.core_count, rd.port_count}")
             # self.capacity_adj_cg(rd)
         else:
-            rd.core_count = self.core_count_lookup_spr(rd.queue_info)
-            log.info(f"core_count spr: {rd.core_count}")
+            rd.core_count,rd.port_count = self.core_count_lookup_spr(rd.queue_info)
+            log.info(f"core_count cg and port count cg: {rd.core_count, rd.port_count}")
             # self.capacity_adj_spr(rd)
         if not self.check_config(rd):
             return False
-        rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
+        if self.test["type"] == "advanced_mixed_traffic":
+            rd.client_port_count = len(rd.test_config["config"]["relationships"])
+            rd.server_port_count = len(rd.test_config["config"]["relationships"])
+        else:
+            rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
+            rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
         log.info(f"client_port_count: {rd.client_port_count}")
-        rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
         log.info(f"server_port_count: {rd.server_port_count}")
         rd.client_core_count = int(
             rd.core_count
-            / (rd.client_port_count + rd.server_port_count)
+            / rd.port_count
             * rd.client_port_count
         )
         log.info(f"client_core_count: {rd.client_core_count}")
@@ -429,13 +593,19 @@ class CfRunTest:
         return True
         
     def check_config(self, rd):
-        if len(rd.test_config["config"]["interfaces"]) == 0:
-            errormsg = 'No subnets/interfaces assigned in test'
+        if self.test["type"] == "advanced_mixed_traffic":
+            interfaces = rd.test_config["config"]["relationships"]
+            information = "relationships"
+        else:
+            interfaces = rd.test_config["config"]["interfaces"]
+            information = "interfaces"
+        if len(interfaces) == 0:
+            errormsg = f"No subnets/{information} assigned in test"
             log.debug(errormsg)
             print(errormsg)
             return False
         return True
-    
+
     # def capacity_adj_cg(self, rd):
     #     rd.core_count = self.core_count_lookup_cg(rd.queue_info)
     #     log.info(f"core_count: {rd.core_count}")
@@ -530,6 +700,8 @@ class CfRunTest:
 
     @staticmethod
     def check_if_number(in_value):
+        if in_value == False or in_value == None:
+            return False
         if isinstance(in_value, int) or isinstance(in_value, float):
             return True
         if isinstance(in_value, str):
@@ -571,16 +743,48 @@ class CfRunTest:
     @staticmethod
     def core_count_lookup_cg(queue_info):
         cores = 0
+        ports = 0
         for cg in queue_info["computeGroups"]:
             cores = cores + int(cg["cores"])
-        return cores
+            ports = ports + len(cg["ports"])
+        return cores,ports
 
     @staticmethod
     def core_count_lookup_spr(queue_info):
         cores = 0
+        ports = 0
         for port in queue_info["ports"]:
             cores = cores + int(port["cores"])
-        return cores
+        ports = queue_info["portCount"]
+        return cores,ports
+
+    def software_version_lookup(self, queue_info):
+        self.divide_by_1000 = True
+        self.model = ""
+        if len(queue_info["computeGroups"]) > 0:
+            self.software_version = queue_info["computeGroups"][0]["software"]
+        else:
+            self.software_version = queue_info["devices"][0]["slots"][0]["computeGroups"][0]["software"]
+        if "l4l7lxc" in self.software_version:
+            self.software_version = self.software_version.split("l4l7lxc")[1]
+            self.model = "lxc"
+        software_version_list = self.software_version.split(".")
+        software_version_list = [int(i) for i in software_version_list]
+        if self.model == "lxc":
+            if software_version_list[0] <= 4:
+                self.divide_by_1000 = False
+            elif software_version_list[0] == 5 and software_version_list[1] < 7:
+                self.divide_by_1000 = False
+        else:
+            if software_version_list[0] <= 19:
+                self.divide_by_1000 = False
+            elif software_version_list[0] == 20:
+                if software_version_list[1] == 0:
+                    self.divide_by_1000 = False
+                elif software_version_list[1] == 1 and software_version_list[2] == 0:
+                    self.divide_by_1000 = False
+        log.info(f"software: {self.software_version}")
+        log.info(f"divide_by_1000: {self.divide_by_1000}")
 
     @staticmethod
     def check_capacity_adjust(
@@ -598,10 +802,10 @@ class CfRunTest:
         load_type = rd.in_load_type.lower()
         test_type = self.test_type(rd)
 
-        if test_type in {"tput", "emix"} and load_type == "simusers":
+        if test_type in {"tput", "emix", "amt"} and load_type == "simusers":
             load_key = "bandwidth"
             rd.in_load_type = "SimUsers"
-        elif test_type in {"tput", "emix"} and load_type == "bandwidth":
+        elif test_type in {"tput", "emix", "amt"} and load_type == "bandwidth":
             load_key = "bandwidth"
             rd.in_load_type = "Bandwidth"
         elif test_type == "tput" and load_type == "simusers/second":
@@ -617,6 +821,7 @@ class CfRunTest:
             load_key = "connectionsPerSecond"
             rd.in_load_type = "SimUsers/Second"
         elif test_type == "conns" and load_type == "simusers":
+            self.ocj.expect_unused('test_type == "conns" and load_type == "simusers"')
             load_key = "connections"
             rd.in_load_type = "SimUsers"
         elif test_type == "conns" and load_type == "connections":
@@ -625,6 +830,8 @@ class CfRunTest:
         else:
             return False
 
+        if test_type == "conns" and rd.in_goal_seek:
+            self.ocj.enable()
         rd.in_start_load = int(rd.in_start_load) * rd.in_capacity_adjust
         self.update_load_constraints(rd)
         load_update = {
@@ -666,6 +873,12 @@ class CfRunTest:
                 "enabled": True,
                 "max": rd.living_simusers_max
             }
+        if rd.simuser_birth_rate_max_bool:
+            constraints = True
+            birth_rate = {
+                "enabled": True,
+                "max": rd.simuser_birth_rate_max * rd.in_capacity_adjust
+            }
         if constraints:
             rd.load_constraints = {
                 "enabled": True,
@@ -684,8 +897,11 @@ class CfRunTest:
             test_type = "conns"
         elif rd.type_v2 == "emix":
             test_type = "emix"
+        elif rd.type_v2 == "advanced_mixed_traffic":
+            test_type = "amt"
         else:
             test_type = "tput"
+        self.test_type = test_type
         return test_type
 
     def start_test_run(self, cf, rd):
@@ -860,6 +1076,9 @@ class CfRunTest:
         rd.c_simusers_sleeping = client_stats.get("simusers", {}).get(
             "simUsersSleeping", 0
         )
+        rd.c_simusers_suspending = client_stats.get("simusers", {}).get(
+            "simUsersSuspending", 0
+        )
         rd.c_current_load = client_stats.get("sum", {}).get("currentLoadSpecCount", 0)
         rd.c_desired_load = client_stats.get("sum", {}).get("desiredLoadSpecCount", 0)
         rd.c_tcp_avg_ttfb = round(
@@ -877,6 +1096,8 @@ class CfRunTest:
         rd.c_url_avg_response_time = round(
             client_stats.get("url", {}).get("averageRespTimePerUrl", 0), 1
         )
+        if self.divide_by_1000:
+            rd.c_url_avg_response_time = round(rd.c_url_avg_response_time / 1000, 3)
         rd.c_tcp_attempted_conn_rate = client_stats.get("sum", {}).get(
             "attemptedConnRate", 0
         )
@@ -895,8 +1116,8 @@ class CfRunTest:
 
         rd.c_total_bandwidth = rd.c_rx_bandwidth + rd.c_tx_bandwidth
         if rd.c_memory_main_size > 0 and rd.c_memory_main_used > 0:
-            rd.c_memory_percent_used = round(
-                rd.c_memory_main_used / rd.c_memory_main_size, 1
+            rd.c_memory_percent_used = round(100 *
+                rd.c_memory_main_used / rd.c_memory_main_size, 2
             )
         if rd.c_current_load > 0 and rd.c_desired_load > 0:
             rd.c_current_desired_load_variance = round(
@@ -907,6 +1128,8 @@ class CfRunTest:
             rd.c_transaction_error_percentage = (
                 rd.c_http_unsuccessful_txns + rd.c_http_aborted_txns
             ) / rd.c_http_successful_txns
+        if rd.phase in ["rampup", "goalseek"]:
+            self.ocj.set_startup_data()
         return True
 
     def assign_server_run_stats(self, rd, server_stats):
@@ -932,8 +1155,8 @@ class CfRunTest:
         rd.s_tcp_closed_reset = server_stats.get("sum", {}).get("closedWithReset", 0)
 
         if rd.s_memory_main_size > 0 and rd.s_memory_main_used > 0:
-            rd.s_memory_percent_used = round(
-                rd.s_memory_main_used / rd.s_memory_main_size, 1
+            rd.s_memory_percent_used = round(100 *
+                rd.s_memory_main_used / rd.s_memory_main_size, 2
             )
         return True
 
@@ -966,6 +1189,15 @@ class CfRunTest:
             f"\n-ttfb: {rd.c_tcp_avg_ttfb:,} -ttfb stable: {rd.rolling_ttfb.stable} "
             f"-ttfb cur avg: {rd.rolling_ttfb.avg_val:,} -ttfb prev: {rd.rolling_ttfb.avg_val_last:,} "
             f"-delta ttfb: {rd.rolling_ttfb.increase_avg} -ttfb list:{rd.rolling_ttfb.list} "
+            f"\n-cpu_c: {rd.c_loadspec_avg_cpu:6.1f}  -pktmemused_c: {rd.c_memory_packetmem_used:4.0f} "
+            f" -memused_c: {rd.c_memory_main_used:5.0f}  -memusedpert_c: {rd.c_memory_percent_used:3.1f}"
+            f" -mem_c: {rd.c_memory_main_size:5.0f}"
+            f"\n-cpu_s: {rd.s_memory_avg_cpu:6.1f}  -pktmemUsed_s: {rd.s_memory_packetmem_used:4.0f} "
+            f" -memused_s: {rd.s_memory_main_used:5.0f}  -memusedperc_s: {rd.s_memory_percent_used:3.1f}"
+            f" -mem_s: {rd.s_memory_main_size:5.0f}"
+            f"\n-attempt txn: {rd.c_http_attempted_txns:9.0f}  -success txns: {rd.c_http_successful_txns:9.0f} "
+            f" -failed txns: {rd.c_http_unsuccessful_txns} (unsucc) + {rd.c_http_aborted_txns} (abort)"
+
             # f"\n-total bw: {rd.c_total_bandwidth:,} -rx bw: {rd.c_rx_bandwidth:,}"
             # f" tx bw: {rd.c_tx_bandwidth:,}"
             # f"\n-ttfb cur avg: {rd.rolling_ttfb.avg_val} -ttfb prev: {rd.rolling_ttfb.avg_val_last} "
@@ -1194,7 +1426,9 @@ class CfRunTest:
             new_load = rd.c_current_load + (rd.in_incr_low *
                                               rd.in_capacity_adjust)
         else:
-            if self.check_if_load_type_simusers(rd):
+            if self.ocj.is_load_type_conns():
+                new_load = self.ocj.get_new_load()
+            elif self.check_if_load_type_simusers(rd):
                 new_load = self.goal_seek_set_simuser_kpi(rd, rd.kpi_1)
                 log.info(f"new_load = {new_load}")
             elif self.check_if_load_type_default(rd):
@@ -1214,7 +1448,10 @@ class CfRunTest:
             log.info(f"Goal_seek return, new_load is False")
             return False
 
-        self.change_update_load(rd, new_load, 16)
+        if self.test_type == "conns":
+            self.change_update_load(rd, new_load, 4)
+        else:
+            self.change_update_load(rd, new_load, 16)
 
         return True
 
@@ -1522,7 +1759,7 @@ class CfRunTest:
             f"\n current load: {rd.c_current_load}"
             f" desired_load: {rd.c_desired_load}"
         )
-        if rd.phase is not "rampseek":
+        if rd.phase != "rampseek":
             log.info(f"phase {rd.phase} is not 'rampseek', "
                      f"returning from contol_test_ramp_seek")
             return
@@ -1575,11 +1812,48 @@ class CfRunTest:
             f"\nKpi1 stable: {kpi_1.stable} list: {kpi_1.list}"
             f"\nKpi2 stable: {kpi_2.stable} list: {kpi_2.list}"
         )
-        if rd.phase is not "goalseek":
+        self.ocj.capture_goal_seek_iteration()
+        if rd.phase != "goalseek":
             log.info(f"phase {rd.phase} is not 'goalseek', "
                      f"returning from contol_test_goal_seek")
             return
-        if not rd.rolling_count_since_goal_seek.stable:
+        if self.test_type == "conns":
+            if rd.in_load_type == "Connections" :
+                log.info(f"tps: {rd.c_http_successful_txns_sec} -cps: {rd.c_tcp_established_conn_rate}")
+                if rd.c_http_successful_txns_sec == 0 or rd.c_tcp_established_conn_rate == 0:
+                    log.info(f"Ready for Open Conns goal seeking")
+                    pass
+                else:
+                    log.info(f"Not ready for Open Conns goal seeking, continue to add load")
+                    return
+            elif rd.in_load_type == "SimUsers":
+                message = "Heap Memory state changed from OK to Throttled Free"
+                log.info(f"rd.c_memory_percent_used is: {rd.c_memory_percent_used}")
+                log.info(f"rd.c_simusers_suspending is: {rd.c_simusers_suspending}")
+                if rd.c_memory_percent_used > 97:
+                    eventlogs = self.cf.fetch_event_logs(rd.id)
+                    for line in eventlogs["logs"]:
+                        if message in line:
+                            log.debug(f"eventLog: \n{json.dumps(eventlogs, indent=4)}")
+                            message = line + f"\nSuspending Simusers: {rd.c_simusers_suspending}, stop goal seek"
+                            print(message)
+                            rd.max_load_reached = True
+                            rd.stop = True
+                            return
+                if rd.c_simusers_suspending > 0:
+                    message = f"Suspending Simusers: {rd.c_simusers_suspending}, stop goal seek"
+                    log.debug(message)
+                    print(message)
+                    rd.max_load_reached = True
+                    rd.stop = True
+                    return
+                if rd.c_tcp_established_conn_rate == 0:
+                    log.info(f"cps: {rd.c_tcp_established_conn_rate}, ready for goal seek")
+                    pass
+                else:
+                    log.info(f"cps: {rd.c_tcp_established_conn_rate}, not ready for goal seek, continue to add load")
+                    return
+        elif not rd.rolling_count_since_goal_seek.stable:
             log.info(f"count since goal seek is not stable. "
                      f"count list: {rd.rolling_count_since_goal_seek.list}")
             return
@@ -1588,7 +1862,9 @@ class CfRunTest:
             rd.stop = True
             return
 
-        if kpis_and_bool:
+        if self.test_type == "conns":
+            goal_seek = True
+        elif kpis_and_bool:
             if kpi_1.stable and kpi_2.stable:
                 goal_seek = True
             else:
