@@ -195,6 +195,7 @@ class RunData:
     client_port_count: int = 1
     server_port_count: int = 1
     client_core_count: int = 3
+    client_portSystemId : str = ''
     in_capacity_adjust: any = 1
     load_constraints: dict = None
 
@@ -223,9 +224,13 @@ class RunData:
     c_rx_bandwidth: int = 0
     c_rx_packet_count: int = 0
     c_rx_packet_rate: int = 0
+    c_rx_byte_rate: int = 0
     c_tx_bandwidth: int = 0
     c_tx_packet_count: int = 0
     c_tx_packet_rate: int = 0
+    c_tx_byte_rate: int = 0
+    c_total_byte_rate: int = 0
+    c_total_packet_count: int = 0
     c_http_aborted_txns: int = 0
     c_http_aborted_txns_sec: int = 0
     c_http_attempted_txns: int = 0
@@ -467,11 +472,14 @@ class CfRunTest:
         rd.queue_info = self.get_queue(cf, rd.queue_id)
         log.info(f"queue info: \n{json.dumps(rd.queue_info, indent=4)}")
         self.init_simuser_birth_rate_max(rd)
-        self.software_version_lookup(rd.queue_info)
 
         if not self.init_capacity_adj(rd):
             return False
 
+        self.software_version_lookup(rd.queue_info)
+        self.get_report_info()
+        self.result_file.make_report_dir(self.report_dir)
+        self.result_file.make_report_csv_file(self.report_name)
         self.init_update_config_load(rd)
         self.update_config_load_controller(cf, rd)
 
@@ -571,9 +579,12 @@ class CfRunTest:
         if self.test["type"] == "advanced_mixed_traffic":
             rd.client_port_count = len(rd.test_config["config"]["relationships"])
             rd.server_port_count = len(rd.test_config["config"]["relationships"])
+            rd.client_portSystemId = rd.test_config["config"]["relationships"][0]["client"]["portSystemId"]
         else:
             rd.client_port_count = len(rd.test_config["config"]["interfaces"]["client"])
             rd.server_port_count = len(rd.test_config["config"]["interfaces"]["server"])
+            rd.client_portSystemId = rd.test_config["config"]["interfaces"]["client"][0]["portSystemId"]
+        self.device_ip = rd.client_portSystemId.split("/", 1)[0]    
         log.info(f"client_port_count: {rd.client_port_count}")
         log.info(f"server_port_count: {rd.server_port_count}")
         rd.client_core_count = int(
@@ -759,12 +770,14 @@ class CfRunTest:
         return cores,ports
 
     def software_version_lookup(self, queue_info):
-        self.divide_by_1000 = True
         self.model = ""
-        if len(queue_info["computeGroups"]) > 0:
-            self.software_version = queue_info["computeGroups"][0]["software"]
-        else:
-            self.software_version = queue_info["devices"][0]["slots"][0]["computeGroups"][0]["software"]
+        self.software_version = ""
+        self.divide_by_1000 = True
+        for device in queue_info["devices"]:
+            if device["ip"] == self.device_ip:
+                self.device_info = device
+                self.software_version = device["slots"][0]["computeGroups"][0]["software"]
+                break
         if "l4l7lxc" in self.software_version:
             self.software_version = self.software_version.split("l4l7lxc")[1]
             self.model = "lxc"
@@ -783,8 +796,26 @@ class CfRunTest:
                     self.divide_by_1000 = False
                 elif software_version_list[1] == 1 and software_version_list[2] == 0:
                     self.divide_by_1000 = False
-        log.info(f"software: {self.software_version}")
+        log.info(f"software version: {self.software_version}")
         log.info(f"divide_by_1000: {self.divide_by_1000}")
+        print(f"software version: {self.software_version}")
+
+    def get_report_info(self):
+        self.device_mode = ""
+        self.device_description = self.device_info["description"][4:]
+        self.device_profile = self.device_info["slots"][0]["profile"]
+        self.device_model = self.device_info["slots"][0]["model"][4:]
+        for profile_info in ["Functional-", "Performance-", "Maximum-"]:
+            if profile_info in self.device_profile:
+                self.device_profile = self.device_profile.split(profile_info)[-1].strip("\n")
+                break
+        if "cfv" in self.device_description.lower():
+            #waiting for issue CF-17490 fixing
+            self.device_model = f"{self.device_model.rsplit('-', 1)[0]}-vCores-{rd.client_core_count*2}"
+            self.report_dir = self.device_model
+        else:
+            self.report_dir = "_".join((self.device_model, self.device_profile))
+        self.report_name = "_".join((self.device_ip, self.software_version))
 
     @staticmethod
     def check_capacity_adjust(
@@ -989,7 +1020,8 @@ class CfRunTest:
 
     def update_run_stats(self, cf, rd):
         get_run_stats = cf.fetch_test_run_statistics(rd.id)
-        # log.debug(f'{get_run_stats}')
+        #log.debug(f'{get_run_stats}')
+        #log.debug(json.dumps(get_run_stats, indent=4))
         self.update_client_stats(rd, get_run_stats)
         self.update_server_stats(rd, get_run_stats)
 
@@ -1032,6 +1064,8 @@ class CfRunTest:
         rd.c_tx_bandwidth = client_stats.get("driver", {}).get("txBandwidth", 0)
         rd.c_tx_packet_count = client_stats.get("driver", {}).get("txPacketCount", 0)
         rd.c_tx_packet_rate = client_stats.get("driver", {}).get("txPacketRate", 0)
+        rd.c_rx_byte_rate = client_stats.get("sum", {}).get("rxByteRate", 0)
+        rd.c_tx_byte_rate = client_stats.get("sum", {}).get("txByteRate", 0)
         rd.c_http_aborted_txns = client_stats.get("http", {}).get("abortedTxns", 0)
         rd.c_http_aborted_txns_sec = client_stats.get("http", {}).get(
             "abortedTxnsPerSec", 0
@@ -1115,6 +1149,8 @@ class CfRunTest:
         rd.time_remaining = client_stats.get("timeRemaining", 0)
 
         rd.c_total_bandwidth = rd.c_rx_bandwidth + rd.c_tx_bandwidth
+        rd.c_total_byte_rate = rd.c_rx_byte_rate + rd.c_tx_byte_rate
+        rd.c_total_packet_count = rd.c_rx_packet_count + rd.c_tx_packet_count
         if rd.c_memory_main_size > 0 and rd.c_memory_main_used > 0:
             rd.c_memory_percent_used = round(100 *
                 rd.c_memory_main_used / rd.c_memory_main_size, 2
@@ -1332,6 +1368,9 @@ class CfRunTest:
 
         i = 0
         while True:
+            if rd.c_desired_load > 0:
+                self.update_run_stats(cf, rd)
+                self.save_results(rd)
             time.sleep(4)
             rd.timer = int(round(time.time() - rd.start_time))
             i += 4
@@ -1718,7 +1757,7 @@ class CfRunTest:
         # stop test and wait for finished status
         if self.stop_wait_for_finished_status(cf, rd):
             rd.time_to_stop = rd.timer - rd.time_to_stop_start
-            self.save_results(rd)
+            #self.save_results(rd)
             return True
         return False
 
@@ -1944,6 +1983,12 @@ class CfRunTest:
             rd.rolling_bw.increase_avg,
             rd.c_rx_bandwidth,
             rd.c_tx_bandwidth,
+            rd.c_total_byte_rate,
+            rd.c_rx_byte_rate,
+            rd.c_tx_byte_rate,
+            rd.c_total_packet_count,
+            rd.c_rx_packet_count,
+            rd.c_tx_packet_count,
             rd.c_rx_packet_rate,
             rd.c_tx_packet_rate,
             rd.s_tcp_closed,
@@ -1979,7 +2024,9 @@ class DetailedCsvReport:
     def __init__(self, report_location):
         log.debug("Initializing detailed csv result files.")
         self.time_stamp = time.strftime("%Y%m%d-%H%M")
-        self.report_csv_file = report_location / f"{self.time_stamp}_Detailed.csv"
+        log.debug(f"Current time stamp: {self.time_stamp}")
+        self.report_location_parent = report_location
+        #self.report_csv_file = report_location / f"{self.time_stamp}_Detailed.csv"
         self.columns = [
             "test_name",
             "seconds",
@@ -2012,6 +2059,12 @@ class DetailedCsvReport:
             "bw_delta",
             "rx_bandwidth",
             "tx_bandwidth",
+            "total_byte_rate",
+            "rx_byte_rate",
+            "tx_byte_rate",
+            "total_packet_count",
+            "rx_packet_count",
+            "tx_packet_count",
             "rx_packet_rate",
             "tx_packet_rate",
             "tcp_closed",
@@ -2073,6 +2126,22 @@ class DetailedCsvReport:
             log.error(
                 f"Exception occurred  writing to the detailed report file: \n<{detailed_exception}>\n"
             )
+    def make_report_csv_file(self, new_report_csv_name):
+        new_report_csv_name = self.report_location / f"{new_report_csv_name}_{self.time_stamp}_Detailed.csv"
+        print(new_report_csv_name)
+        if new_report_csv_name.is_file():
+            return
+        else:
+            self.report_csv_file = new_report_csv_name
+            self.append_columns()
+
+    def make_report_dir(self, report_dir_name):
+        report_dir = self.report_location_parent / report_dir_name
+        if report_dir.is_dir():
+            pass
+        else:
+            report_dir.mkdir(parents=False, exist_ok=True)
+        self.report_location = report_dir
 
 
 class Report:
@@ -2152,6 +2221,8 @@ class Report:
             d["max_tps_seconds"] = self.df_base.loc[
                 self.df_base["tps"] == d["tps_max"], "seconds"
             ].iloc[0]
+            d["avg_pkt_size"] = int(self.df_base.loc[self.df_base["test_name"] == name, "total_byte_rate"].sum()/
+                                self.df_base.loc[self.df_base["test_name"] == name, "total_packet_count"].sum())
             # get script version from test
             d["version"] = self.df_base.loc[self.df_base["test_name"] == name, "version"].iloc[0]
 
@@ -2209,6 +2280,7 @@ class Report:
                     "successful_txn",
                     "unsuccessful_txn",
                     "aborted_txn",
+                    "avg_pkt_size",
                     "total_tcp_established",
                     "total_tcp_attempted",
                     "tps_stdy_min",
@@ -2323,6 +2395,11 @@ class Report:
             "tcp_avg_ttfb": {
                 "width": "3.7em",
                 "min-width": "3.7em",
+                "text-align": "right",
+            },
+            "avg_pkt_size": {
+                "width": "7em",
+                "min-width": "6em",
                 "text-align": "right",
             },
             "url_response_time": {

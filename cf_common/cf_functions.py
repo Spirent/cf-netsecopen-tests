@@ -26,8 +26,11 @@ def verify_directory_structure(bool_project_dir, input_dir, output_dir, report_d
 
 
 def html_report(df_table, sub_report_tables, html_report_file, filter_columns,
-                script_version):
+                script_version, report_header=""):
     html = ""
+    report_header_html = f"<h2 style='color:Tomato;'>{report_header}</h2>"
+    html = html + report_header_html
+
     for sub_table in sub_report_tables:
         df_table.reset_df_filter()
         df_table.filter_rows_containing(sub_table)
