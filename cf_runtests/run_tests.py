@@ -30,10 +30,11 @@ with open(tests_to_run, "r") as f:
 test_list = sorted(test_list, key=lambda k: int(k["run_order"]))
 log.debug(f"test list:\n{test_list}")
 
+report_header = ""
+if len(sys.argv) >1:
+    report_header = " ".join(sys.argv[1:])
+    print(f"User defined report header: {report_header}")
 detailed_report = DetailedCsvReport(report_dir)
-detailed_report.append_columns()
-html_report_file = detailed_report.report_csv_file.with_suffix(".html")
-print(f"Report location: {html_report_file}")
 
 for test in test_list:
     if test["run"].lower() in {"y", "yes", "true"}:
@@ -55,12 +56,12 @@ for test in test_list:
             file_name = file_name[: -len("_Detailed")]
         # create summary csv report with all columns
         csv_name = file_name + "_all"
-        csv_report_file = pathlib.Path(file_path / csv_name).with_suffix(".csv")
+        csv_report_file = pathlib.Path(file_path / f"{csv_name}.csv")
         print(csv_report_file)
         csv_report(table, csv_report_file)
         # create html report files
         for k, v in html_additional_reports.items():
             new_name = file_name + "_" + k
-            report_file = pathlib.Path(file_path / new_name).with_suffix(".html")
+            report_file = pathlib.Path(file_path / f"{new_name}.html")
             print(report_file)
-            html_report(table, report_tables, report_file, v, script_version)
+            html_report(table, report_tables, report_file, v, script_version, report_header)

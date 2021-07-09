@@ -44,7 +44,7 @@ run_tests_from_csv = 'run_tests.csv'  # from Global_settings input_location
 html_report_csv = None  # If None take latest csv file from Report directory
 report_tables = ['HTTP-CPS', 'HTTP-TPUT', 'TLS-CPS', 'TLS-TPUT', 'HTTP-LAT', 'TLS-LAT', 'HTTP-CON', 'TLS-CON', None]
 col_order = ['test_name', 'cps', 'tps', 'total_bandwidth', 'open_conns',
-             'tcp_avg_tt_synack', 'tcp_avg_ttfb', 'url_response_time',
+             'tcp_avg_tt_synack', 'tcp_avg_ttfb', 'avg_pkt_size', 'url_response_time',
              'successful_txn', 'unsuccessful_txn', 'aborted_txn',
              'total_tcp_established', 'total_tcp_attempted',
              'tps_stdy_min', 'tps_stdy_max', 'tps_stdy_delta',
