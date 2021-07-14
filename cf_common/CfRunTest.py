@@ -2221,8 +2221,12 @@ class Report:
             d["max_tps_seconds"] = self.df_base.loc[
                 self.df_base["tps"] == d["tps_max"], "seconds"
             ].iloc[0]
-            d["avg_pkt_size"] = int(self.df_base.loc[self.df_base["test_name"] == name, "total_byte_rate"].sum()/
-                                self.df_base.loc[self.df_base["test_name"] == name, "total_packet_count"].sum())
+            total_pkt_count_sum = self.df_base.loc[self.df_base["test_name"] == name, "total_packet_count"].sum()
+            total_byte_rate_sum = self.df_base.loc[self.df_base["test_name"] == name, "total_byte_rate"].sum()
+            if total_pkt_count_sum > 0:
+                d["avg_pkt_size"] = int(total_byte_rate_sum / total_pkt_count_sum)
+            else:
+                d["avg_pkt_size"] = 0
             # get script version from test
             d["version"] = self.df_base.loc[self.df_base["test_name"] == name, "version"].iloc[0]
 
