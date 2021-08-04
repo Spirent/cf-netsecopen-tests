@@ -477,7 +477,7 @@ class CfRunTest:
             return False
 
         self.software_version_lookup(rd.queue_info)
-        self.get_report_info()
+        self.get_report_info(rd)
         self.result_file.make_report_dir(self.report_dir)
         self.result_file.make_report_csv_file(self.report_name)
         self.init_update_config_load(rd)
@@ -800,7 +800,7 @@ class CfRunTest:
         log.info(f"divide_by_1000: {self.divide_by_1000}")
         print(f"software version: {self.software_version}")
 
-    def get_report_info(self):
+    def get_report_info(self, rd):
         self.device_mode = ""
         self.device_description = self.device_info["description"][4:]
         self.device_profile = self.device_info["slots"][0]["profile"]
