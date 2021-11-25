@@ -284,6 +284,8 @@ class RunData:
 
     first_ramp_load_increase: bool = True
     first_goal_load_increase: bool = True
+    minimum_goal_seek_count: int = 1
+    goal_seek_count: int = 0
     max_load_reached: bool = False
     max_load: int = 0
     stop: bool = False  # test loop control
@@ -817,6 +819,27 @@ class CfRunTest:
             self.report_dir = "_".join((self.device_model, self.device_profile))
         self.report_name = "_".join((self.device_ip, self.software_version))
 
+    def update_startload_rampup_for_ec_sha384_on_cfv(self, rd):
+        update_flag = False
+        sslTls_hash = []
+        if "cfv" in self.device_description.lower():
+            sslTls_hash = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("ciphers", [])
+        if sslTls_hash:
+            for each_hash in sslTls_hash:
+                if "SHA384" in each_hash and "ECDHE" in each_hash:
+                    update_flag = True
+                    break
+        if update_flag:
+            if int(rd.in_start_load) < 8:
+                rd.in_start_load = 8
+            if self.test_type == "cps":
+                if int(rd.in_rampup) < 120:
+                    rd.in_rampup = 120
+            if self.test_type == "tput":
+                if int(rd.in_rampup) < 180:
+                    rd.in_rampup = 180
+        return
+
     @staticmethod
     def check_capacity_adjust(
         cap_adjust, load_type, client_port_count, client_core_count
@@ -863,6 +886,7 @@ class CfRunTest:
 
         if test_type == "conns" and rd.in_goal_seek:
             self.ocj.enable()
+        self.update_startload_rampup_for_ec_sha384_on_cfv(rd)
         rd.in_start_load = int(rd.in_start_load) * rd.in_capacity_adjust
         self.update_load_constraints(rd)
         load_update = {
@@ -1460,8 +1484,11 @@ class CfRunTest:
             rd.stop = True
             log.info(f"goal_seek stop, c_current_load == 0")
             return False
-        if rd.first_goal_load_increase:
+        if rd.goal_seek_count >= rd.minimum_goal_seek_count:
             rd.first_goal_load_increase = False
+        else:
+            rd.first_goal_load_increase = True
+        if rd.first_goal_load_increase:
             new_load = rd.c_current_load + (rd.in_incr_low *
                                               rd.in_capacity_adjust)
         else:
@@ -1566,6 +1593,7 @@ class CfRunTest:
             log.error(
                 f"Exception occurred when changing test: " f"\n<{detailed_exception}>"
             )
+        rd.goal_seek_count = rd.goal_seek_count + 1    
         self.countdown(count_down)
         return True
 
@@ -1901,7 +1929,13 @@ class CfRunTest:
             rd.stop = True
             return
 
+        if rd.goal_seek_count < 3:
+            if not kpi_1.stable or not kpi_2.stable:
+                rd.minimum_goal_seek_count = 3
+
         if self.test_type == "conns":
+            goal_seek = True
+        elif rd.goal_seek_count < rd.minimum_goal_seek_count:
             goal_seek = True
         elif kpis_and_bool:
             if kpi_1.stable and kpi_2.stable:
