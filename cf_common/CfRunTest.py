@@ -822,7 +822,7 @@ class CfRunTest:
     def update_startload_rampup_for_ec_sha384_on_cfv(self, rd):
         update_flag = False
         sslTls_hash = []
-        if "cfv" in self.device_description.lower():
+        if rd.in_goal_seek and "cfv" in self.device_description.lower():
             sslTls_hash = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("ciphers", [])
         if sslTls_hash:
             for each_hash in sslTls_hash:
@@ -838,6 +838,8 @@ class CfRunTest:
             if self.test_type == "tput":
                 if int(rd.in_rampup) < 180:
                     rd.in_rampup = 180
+            if int(rd.in_duration) < int(rd.in_startup) + int(rd.in_rampup) + int(rd.in_rampdown) + int(rd.in_shutdown):
+                rd.in_duration = int(rd.in_startup) + int(rd.in_rampup) + int(rd.in_rampdown) + int(rd.in_shutdown) + 60
         return
 
     @staticmethod
