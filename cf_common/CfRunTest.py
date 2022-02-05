@@ -426,7 +426,7 @@ class CfOpenConns:
                     self.rt.rd.c_current_load - self.c_startup_load
                 )
                 self.inc_conns_within_c_mem = int(
-                    0.95 * self.c_new_conns_mem / self.c_mem_per_conn
+                    0.96 * self.c_new_conns_mem / self.c_mem_per_conn
                 )
                 log.info(
                     f"CfOpenConns -- c_mem_per_conn: {self.c_mem_per_conn}; "
@@ -1782,6 +1782,7 @@ class CfRunTest:
             print(f"")
             time.sleep(4)
         # if goal_seek is yes enter sustained steady phase
+        self.wait_openconn_cps_end(cf, rd)
         if rd.in_goal_seek and rd.in_sustain_period > 0:
             self.sustain_test(cf, rd)
         # stop test and wait for finished status
@@ -1959,6 +1960,18 @@ class CfRunTest:
             else:
                 log.info(f"control_test end, goal_seek False")
                 rd.stop = True
+
+    def wait_openconn_cps_end(self, cf, rd):
+        if self.test_type == "conns" and rd.in_load_type == "SimUsers":
+            while rd.c_tcp_established_conn_rate > 0:
+                log.info(f"still waiting cps down to 0")
+                self.update_run_stats(cf, rd)
+                if rd.sub_status is None:
+                    self.print_test_stats(rd)
+                    self.save_results(rd)
+                time.sleep(4)
+        return True
+
 
     def sustain_test(self, cf, rd):
         rd.phase = "steady"
