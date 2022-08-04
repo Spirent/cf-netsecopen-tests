@@ -783,6 +783,9 @@ class CfRunTest:
         if "l4l7lxc" in self.software_version:
             self.software_version = self.software_version.split("l4l7lxc")[1]
             self.model = "lxc"
+        if "l4l7Vm" in self.software_version:
+            self.software_version = self.software_version.split("l4l7Vm")[1]
+            self.model = "lxc"
         software_version_list = self.software_version.split(".")
         software_version_list = [int(i) for i in software_version_list]
         if self.model == "lxc":
