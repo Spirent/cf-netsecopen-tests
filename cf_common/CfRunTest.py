@@ -565,7 +565,7 @@ class CfRunTest:
             self.test["simuser_birth_rate_max"] = "none"
             return
         if "CF400" in self.device_model:
-            rd.simuser_birth_rate_max_capacity = 2
+            rd.simuser_birth_rate_max_capacity = 3
         self.sslTls_enabled = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("enabled", False)
         if self.sslTls_enabled:
             self.test["simuser_birth_rate_max"] = rd.sslTls_simuser_birth_rate_max * rd.simuser_birth_rate_max_capacity
