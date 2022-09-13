@@ -182,6 +182,9 @@ class RunData:
     living_simusers_max_bool: bool = False
     living_simusers_max: int = 1 
     simuser_birth_rate_max_bool: bool = False
+    simuser_birth_rate_max: int = 450
+    sslTls_simuser_birth_rate_max: int = 30
+    simuser_birth_rate_max_capacity: float = 1
 
     in_goal_seek: bool = False
     first_steady_interval: bool = True
@@ -480,7 +483,6 @@ class CfRunTest:
         rd.queue_id = rd.test_config["config"]["queue"]["id"]
         rd.queue_info = self.get_queue(cf, rd.queue_id)
         log.info(f"queue info: \n{json.dumps(rd.queue_info, indent=4)}")
-        self.init_simuser_birth_rate_max(rd)
 
         if not self.init_capacity_adj(rd):
             return False
@@ -489,6 +491,7 @@ class CfRunTest:
         self.get_report_info(rd)
         self.result_file.make_report_dir(self.report_dir)
         self.result_file.make_report_csv_file(self.report_name)
+        self.init_simuser_birth_rate_max(rd)
         self.init_update_config_load(rd)
         self.update_config_load_controller(cf, rd)
 
@@ -561,11 +564,13 @@ class CfRunTest:
         if not (rd.type_v2 == "open_connections" and rd.in_load_type == "simusers"):
             self.test["simuser_birth_rate_max"] = "none"
             return
+        if "CF400" in self.device_model:
+            rd.simuser_birth_rate_max_capacity = 2
         self.sslTls_enabled = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("enabled", False)
         if self.sslTls_enabled:
-            self.test["simuser_birth_rate_max"] = 30
+            self.test["simuser_birth_rate_max"] = rd.sslTls_simuser_birth_rate_max * rd.simuser_birth_rate_max_capacity
         else:
-            self.test["simuser_birth_rate_max"] = 450
+            self.test["simuser_birth_rate_max"] = rd.simuser_birth_rate_max * rd.simuser_birth_rate_max_capacity
         rd.simuser_birth_rate_max_bool = self.check_if_number(
             self.test.get("simuser_birth_rate_max", False))
         rd.simuser_birth_rate_max = self.return_int_if_present(
