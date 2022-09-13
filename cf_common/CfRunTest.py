@@ -245,6 +245,7 @@ class RunData:
     c_memory_main_used: int = 0
     c_memory_packetmem_used: int = 0
     c_memory_rcv_queue_length: int = 0
+    c_mem_per_conn: int = 55
     c_simusers_alive: int = 0
     c_simusers_animating: int = 0
     c_simusers_blocking: int = 0
@@ -321,6 +322,10 @@ class RunData:
 
 class CfOpenConns:
     def __init__(self, rt):
+        self.c_startup_load: int = 0
+        self.c_startup_mem: int = 0
+        self.c_new_conns_mem: int = 0
+        self.inc_conns_within_c_mem: int = 0
         self.rt = rt  # the CfRunTest object
         self.disabled = True
         self.got_startup_data = False
@@ -417,33 +422,35 @@ class CfOpenConns:
             and self.rt.rd.c_memory_percent_used > 99.5
         ):
             self.rt.rd.max_load_reached = True
-        if self.rt.rd.max_load_reached == True:
+        if self.rt.rd.max_load_reached:
             log.info("CfOpenConns -- No more load increase; stop seeking.")
             return False
         if self.first_new_load:
-            if self.rt.rd.c_current_load - self.c_startup_load > 0:
-                self.c_mem_per_conn = (self.rt.rd.c_memory_main_used - self.c_startup_mem) / (
+            if self.rt.rd.c_current_load - self.c_startup_load > 0 and self.rt.rd.c_memory_main_used - self.c_startup_mem > 100:
+                self.first_new_load = False
+                self.rt.rd.c_mem_per_conn = (self.rt.rd.c_memory_main_used - self.c_startup_mem) / (
                     self.rt.rd.c_current_load - self.c_startup_load
                 )
                 self.inc_conns_within_c_mem = int(
-                    0.96 * self.c_new_conns_mem / self.c_mem_per_conn
+                    0.96 * self.c_new_conns_mem / self.rt.rd.c_mem_per_conn
                 )
-                log.info(
-                    f"CfOpenConns -- c_mem_per_conn: {self.c_mem_per_conn}; "
-                    f"self.inc_conns_within_c_mem: {self.inc_conns_within_c_mem}"
+            else:
+                self.inc_conns_within_c_mem = 5000
+            log.info(
+                f"CfOpenConns -- c_mem_per_conn: {self.rt.rd.c_mem_per_conn}; "
+                f"self.inc_conns_within_c_mem: {self.inc_conns_within_c_mem}"
                 )
-            self.first_new_load = False
         if self.rt.rd.c_memory_percent_used > 97:
             self.current_step = 0
             self.inc_conns_within_c_mem = self.rt.rd.in_incr_high * self.rt.rd.in_capacity_adjust
         elif self.current_step > self.steps_to_max and self.rt.rd.c_memory_percent_used <= 97:
             self.current_step = 1
             self.c_new_conns_mem = self.rt.rd.c_memory_main_size - self.rt.rd.c_memory_main_used
-            self.inc_conns_within_c_mem = int(self.c_new_conns_mem / self.c_mem_per_conn)
+            self.inc_conns_within_c_mem = int(self.c_new_conns_mem / self.rt.rd.c_mem_per_conn)
         if self.current_step <= self.steps_to_max:
             binary_deductor = 1 / (2 ** self.current_step)
         # bincurrent_stepary deductor generates a progression like this: 1/2, 1/4, 1/8, ..., 0
-        new_load = self.rt.rd.c_current_load +  int(binary_deductor * self.inc_conns_within_c_mem)
+        new_load = self.rt.rd.c_current_load + int(binary_deductor * self.inc_conns_within_c_mem)
         log.info(
             f"CfOpenConns -- current_step: {self.current_step}; "
             f"cur load: {self.rt.rd.c_current_load}, new_load: {new_load}, add load: {binary_deductor * self.inc_conns_within_c_mem}"
@@ -554,8 +561,8 @@ class CfRunTest:
         if not (rd.type_v2 == "open_connections" and rd.in_load_type == "simusers"):
             self.test["simuser_birth_rate_max"] = "none"
             return
-        sslTls_enabled = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("enabled", False)
-        if sslTls_enabled:
+        self.sslTls_enabled = rd.test_config.get("config", {}).get("protocol", {}).get("supplemental", {}).get("sslTls", {}).get("enabled", False)
+        if self.sslTls_enabled:
             self.test["simuser_birth_rate_max"] = 30
         else:
             self.test["simuser_birth_rate_max"] = 450
