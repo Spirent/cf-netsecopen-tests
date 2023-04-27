@@ -2334,7 +2334,7 @@ class Report:
     def filter_columns(self, filtered_columns):
         if filtered_columns is not None:
             self.df_filter.drop(
-                self.df_filter.columns.difference(filtered_columns), 1, inplace=True
+                self.df_filter.columns.difference(filtered_columns), axis=1, inplace=True
             )
 
     def format_results(self):
@@ -2561,6 +2561,9 @@ class Report:
         for k, v in props.items():
             if k in all_columns:
                 html = html.set_properties(subset=k, **v)
-        html = html.set_table_styles(selected_style).hide_index().render()
+        try:
+            html = html.set_table_styles(selected_style).hide_index().render()
+        except AttributeError:
+            html = html.set_table_styles(selected_style).hide(axis=0).to_html()
 
         return html
